@@ -26,61 +26,98 @@ export class GameService {
   }
 
   static createGame(roomId: number, playerIds: number[]): Game {
-    let deck = this.createDeck();
-    
-    // Deal 5 cards to each player
-    const hands: Map<number, Card[]> = new Map();
-    playerIds.forEach(id => hands.set(id, []));
+    // Wrap entire game creation in a transaction
+    const createGameTransaction = db.transaction(() => {
+      let deck = this.createDeck();
+      
+      // Validate we have enough cards
+      const totalCardsNeeded = 5 * playerIds.length + 1; // 5 per player + 1 for top card
+      if (deck.length < totalCardsNeeded) {
+        throw new Error(`Not enough cards in deck. Need ${totalCardsNeeded}, have ${deck.length}`);
+      }
+      
+      // Deal 5 cards to each player
+      const hands: Map<number, Card[]> = new Map();
+      playerIds.forEach(id => hands.set(id, []));
 
-    for (let i = 0; i < 5; i++) {
-      for (const playerId of playerIds) {
+      for (let i = 0; i < 5; i++) {
+        for (const playerId of playerIds) {
+          hands.get(playerId)!.push(deck.pop()!);
+        }
+      }
+
+      // Get starting card (not an 8)
+      let topCard: Card | undefined;
+      let attempts = 0;
+      const MAX_ATTEMPTS = 10;
+      
+      do {
         if (deck.length === 0) {
-        throw new Error("Somehow, there's no cards in the deck");
-      }
-        hands.get(playerId)!.push(deck.pop()!);
-      }
-    }
+          throw new Error("No cards left in deck to find starting card");
+        }
+        if (attempts >= MAX_ATTEMPTS) {
+          throw new Error("Could not find a non-8 starting card after multiple attempts");
+        }
+        topCard = deck.pop()!;
+        attempts++;
+      } while (topCard.rank === "8");
 
-    // Get starting card (not an 8)
-    let topCard: Card;
-    do {
-      topCard = deck.pop()!;
-    } while (topCard.rank === "8");
-
-    const stmt = db.prepare(`
+      // Create the game record
+      const stmt = db.prepare(`
         INSERT INTO games (room_id, current_player_id, direction, top_card, active_suit, deck, status)
         VALUES (?, ?, ?, ?, ?, ?, 'active')
-    `);
+      `);
 
-    const result = stmt.run(
-      roomId,
-      playerIds[0],
-      "clockwise",
-      JSON.stringify(topCard),
-      topCard.suit,
-      JSON.stringify(deck)
-    );
+      const result = stmt.run(
+        roomId,
+        playerIds[0],
+        "clockwise",
+        JSON.stringify(topCard),
+        topCard.suit,
+        JSON.stringify(deck)
+      );
 
-    const gameId = result.lastInsertRowid as number;
+      const gameId = result.lastInsertRowid as number;
 
-    // Create hands for each player
-    for (const [playerId, cards] of hands.entries()) {
-      this.createHand(gameId, playerId, cards);
+      // Create hands for each player
+      for (const [playerId, cards] of hands.entries()) {
+        this.createHandInternal(gameId, playerId, cards);
+      }
+
+      // Log game start
+      this.logTurn(gameId, playerIds[0], "play_card", topCard);
+
+      return gameId;
+    });
+
+    // Execute the transaction
+    const gameId = createGameTransaction();
+    
+    // Fetch and return the complete game
+    const game = this.getGameById(gameId);
+    if (!game) {
+      throw new Error("Failed to retrieve created game");
     }
-
-    return this.getGameById(gameId)!;
+    
+    return game;
   }
 
-  static createHand(gameId: number, userId: number, cards: Card[]): Hand {
+  // Internal method for use within transactions (doesn't fetch the created hand)
+  private static createHandInternal(gameId: number, userId: number, cards: Card[]): number {
     const stmt = db.prepare(`
       INSERT INTO hands (game_id, user_id, cards, card_count)
       VALUES (?, ?, ?, ?)
     `);
 
     const result = stmt.run(gameId, userId, JSON.stringify(cards), cards.length);
-    
+    return result.lastInsertRowid as number;
+  }
+
+  // Public method that also fetches the created hand
+  static createHand(gameId: number, userId: number, cards: Card[]): Hand {
+    const id = this.createHandInternal(gameId, userId, cards);
     const getHand = db.prepare("SELECT * FROM hands WHERE id = ?");
-    return getHand.get(result.lastInsertRowid) as Hand;
+    return getHand.get(id) as Hand;
   }
 
   static getGameById(id: number): Game | undefined {
@@ -112,57 +149,69 @@ export class GameService {
   }
 
   static playCard(gameId: number, userId: number, card: Card, declaredSuit?: string): void {
-    const game = this.getGameById(gameId);
-    if (!game) throw new Error("Game not found");
+    // Wrap in transaction to ensure all updates happen together
+    const playCardTransaction = db.transaction(() => {
+      const game = this.getGameById(gameId);
+      if (!game) throw new Error("Game not found");
 
-    // Update top card and active suit
-    const updateGame = db.prepare(`
-      UPDATE games
-      SET top_card = ?, active_suit = ?
-      WHERE id = ?
-    `);
-    updateGame.run(
-      JSON.stringify(card),
-      declaredSuit || card.suit,
-      gameId
-    );
+      // Update top card and active suit
+      const updateGame = db.prepare(`
+        UPDATE games
+        SET top_card = ?, active_suit = ?
+        WHERE id = ?
+      `);
+      updateGame.run(
+        JSON.stringify(card),
+        declaredSuit || card.suit,
+        gameId
+      );
 
-    // Log the turn
-    this.logTurn(gameId, userId, "play_card", card, declaredSuit);
+      // Log the turn
+      this.logTurn(gameId, userId, "play_card", card, declaredSuit);
 
-    // Add to discard pile
-    const addDiscard = db.prepare(`
-      INSERT INTO discard_pile (game_id, card, played_by)
-      VALUES (?, ?, ?)
-    `);
-    addDiscard.run(gameId, JSON.stringify(card), userId);
+      // Add to discard pile
+      const addDiscard = db.prepare(`
+        INSERT INTO discard_pile (game_id, card, played_by)
+        VALUES (?, ?, ?)
+      `);
+      addDiscard.run(gameId, JSON.stringify(card), userId);
+    });
+
+    playCardTransaction();
   }
 
   static drawCard(gameId: number, userId: number): Card | null {
-    const game = this.getGameById(gameId);
-    if (!game) throw new Error("Game not found");
+    // Wrap in transaction to ensure deck update and hand update happen together
+    const drawCardTransaction = db.transaction(() => {
+      const game = this.getGameById(gameId);
+      if (!game) throw new Error("Game not found");
 
-    const deck: Card[] = JSON.parse(game.deck);
-    if (deck.length === 0) return null;
+      const deck: Card[] = JSON.parse(game.deck);
+      if (deck.length === 0) return null;
 
-    const card = deck.pop()!;
+      const card = deck.pop()!;
 
-    // Update deck
-    const updateDeck = db.prepare("UPDATE games SET deck = ? WHERE id = ?");
-    updateDeck.run(JSON.stringify(deck), gameId);
+      // Update deck
+      const updateDeck = db.prepare("UPDATE games SET deck = ? WHERE id = ?");
+      updateDeck.run(JSON.stringify(deck), gameId);
 
-    // Update hand
-    const hand = this.getHand(gameId, userId);
-    if (hand) {
-      const cards: Card[] = JSON.parse(hand.cards);
-      cards.push(card);
-      this.updateHand(gameId, userId, cards);
-    }
+      // Update hand
+      const hand = this.getHand(gameId, userId);
+      if (hand) {
+        const cards: Card[] = JSON.parse(hand.cards);
+        cards.push(card);
+        this.updateHand(gameId, userId, cards);
+      } else {
+        throw new Error("Hand not found for user");
+      }
 
-    // Log the turn
-    this.logTurn(gameId, userId, "draw_card", null, null, 1);
+      // Log the turn
+      this.logTurn(gameId, userId, "draw_card", null, null, 1);
 
-    return card;
+      return card;
+    });
+
+    return drawCardTransaction();
   }
 
   static logTurn(

@@ -44,13 +44,3 @@ app.use((error: any, _request: express.Request, response: express.Response, _nex
 app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
-
-app.use((error: any, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
-  response.status(error.status || 500);
-  response.json({
-    error: {
-      message: error.message,
-      status: error.status || 500
-    }
-  });
-});

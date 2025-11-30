@@ -26,7 +26,6 @@ export class RoomService {
     
     const result = stmt.run(name, code, hostId, maxPlayers, isPrivate ? 1 : 0);
     return this.getRoomById(result.lastInsertRowid as number)!;
-    ;
   }
   
   static setPlayerReady(roomId: number, userId: number, isReady: boolean): void {
@@ -35,17 +34,64 @@ export class RoomService {
       SET is_ready = ?
       WHERE room_id = ? AND user_id = ?
     `);
-    stmt.run(isReady ? 1 : 0, roomId, userId);
+    
+    const result = stmt.run(isReady ? 1 : 0, roomId, userId);
+    
+    // Check if the update actually affected any rows
+    if (result.changes === 0) {
+      throw new Error(`User ${userId} is not a member of room ${roomId}`);
+    }
+  }
+
+  static getPlayerReadyStatus(roomId: number, userId: number): boolean {
+    const stmt = db.prepare(`
+      SELECT is_ready FROM room_members
+      WHERE room_id = ? AND user_id = ?
+    `);
+    
+    const member = stmt.get(roomId, userId) as { is_ready: number } | undefined;
+    
+    if (!member) {
+      throw new Error(`User ${userId} is not a member of room ${roomId}`);
+    }
+    
+    return member.is_ready === 1;
+  }
+
+  static areAllPlayersReady(roomId: number): boolean {
+    const stmt = db.prepare(`
+      SELECT COUNT(*) as total, SUM(is_ready) as ready
+      FROM room_members
+      WHERE room_id = ?
+    `);
+    
+    const result = stmt.get(roomId) as { total: number; ready: number | null };
+    
+    // Need at least 2 players and all must be ready
+    return result.total >= 2 && result.ready === result.total;
   }
 
   static getRoomById(id: number): Room | undefined {
     const stmt = db.prepare("SELECT * FROM rooms WHERE id = ?");
-    return stmt.get(id) as Room | undefined;
+    const room = stmt.get(id) as Room | undefined;
+    
+    // Convert SQLite integers to booleans
+    if (room) {
+      room.is_private = Boolean(room.is_private);
+    }
+    
+    return room;
   }
 
   static getRoomByCode(code: string): Room | undefined {
     const stmt = db.prepare("SELECT * FROM rooms WHERE code = ?");
-    return stmt.get(code) as Room | undefined;
+    const room = stmt.get(code) as Room | undefined;
+    
+    if (room) {
+      room.is_private = Boolean(room.is_private);
+    }
+    
+    return room;
   }
 
   static getRoomWithMembers(roomId: number): RoomWithMembers | undefined {
@@ -61,6 +107,12 @@ export class RoomService {
     `);
 
     const members = stmt.all(roomId) as (RoomMember & { username: string })[];
+    
+    // Convert is_ready from integer to boolean
+    members.forEach(member => {
+      member.is_ready = Boolean(member.is_ready);
+    });
+    
     return { ...room, members };
   }
 
@@ -72,7 +124,15 @@ export class RoomService {
       AND (SELECT COUNT(*) FROM room_members WHERE room_id = r.id) < r.max_players
       ORDER BY r.created_at DESC
     `);
-    return stmt.all() as Room[];
+    
+    const rooms = stmt.all() as Room[];
+    
+    // Convert is_private from integer to boolean
+    rooms.forEach(room => {
+      room.is_private = Boolean(room.is_private);
+    });
+    
+    return rooms;
   }
 
   static updateRoomStatus(roomId: number, status: Room["status"]): void {
@@ -94,7 +154,12 @@ export class RoomService {
     const result = stmt.run(roomId, userId);
     
     const getMember = db.prepare("SELECT * FROM room_members WHERE id = ?");
-    return getMember.get(result.lastInsertRowid) as RoomMember;
+    const member = getMember.get(result.lastInsertRowid) as RoomMember;
+    
+    // Convert is_ready from integer to boolean
+    member.is_ready = Boolean(member.is_ready);
+    
+    return member;
   }
 
   static removeMember(roomId: number, userId: number): void {
@@ -104,7 +169,6 @@ export class RoomService {
     `);
     stmt.run(roomId, userId);
   }
-
 
   static assignPlayerOrders(roomId: number): void {
     const members = db.prepare(`
@@ -122,7 +186,14 @@ export class RoomService {
 
   static getRoomMembers(roomId: number): RoomMember[] {
     const stmt = db.prepare("SELECT * FROM room_members WHERE room_id = ?");
-    return stmt.all(roomId) as RoomMember[];
+    const members = stmt.all(roomId) as RoomMember[];
+    
+    // Convert is_ready from integer to boolean
+    members.forEach(member => {
+      member.is_ready = Boolean(member.is_ready);
+    });
+    
+    return members;
   }
 
   static isRoomFull(roomId: number): boolean {

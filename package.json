@@ -1,9 +1,22 @@
 {
-  "name": "term-project",
+  "name": "term-project-z-k",
   "version": "1.0.0",
   "main": "index.js",
   "scripts": {
-    "start:dev": "nodemon --exec ts-node src/backend/server.ts"
+    "start:dev": "nodemon --exec ts-node src/backend/server.ts",
+    "build": "tsc",
+    "start": "node dist/backend/server.js",
+    "test": "ts-node src/backend/test/test-all.ts",
+    "test:watch": "nodemon --exec ts-node src/backend/test/test-all.ts",
+    "migrate:up": "ts-node src/backend/db/migrate.ts up",
+    "migrate:down": "ts-node src/backend/db/migrate.ts down",
+    "migrate:status": "ts-node src/backend/db/migrate-status.ts",
+    "db:reset": "npm run db:clear && npm run migrate:up",
+    "db:setup": "node setup-migrations.js",
+    "db:populate": "ts-node src/backend/db/populate-db.ts",
+    "db:clear": "node -e \"const fs = require('fs'); if (fs.existsSync('crazy_eights.db')) fs.unlinkSync('crazy_eights.db'); console.log('Database cleared');\"",
+    "db:fresh": "npm run db:clear && npm run migrate:up && npm run db:populate",
+    "test:migrations": "ts-node src/backend/test/test-migrations.ts"
   },
   "keywords": [],
   "author": "",

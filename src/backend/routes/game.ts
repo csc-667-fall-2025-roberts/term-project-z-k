@@ -30,11 +30,36 @@ router.get("/rooms", (_req, res) => {
   }
 });
 
-// Join a room
+// Get a specific room with members
+router.get("/rooms/:roomId", (req, res) => {
+  try {
+    const roomId = parseInt(req.params.roomId);
+    
+    if (isNaN(roomId)) {
+      return res.status(400).json({ error: "Invalid room ID" });
+    }
+    
+    const room = RoomService.getRoomWithMembers(roomId);
+    
+    if (!room) {
+      return res.status(404).json({ error: "Room not found" });
+    }
+    
+    res.json(room);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
+// Join a room by code
 router.post("/rooms/:code/join", (req, res) => {
   try {
     const { code } = req.params;
     const { userId } = req.body;
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
     
     const room = RoomService.getRoomByCode(code);
     if (!room) {
@@ -54,14 +79,104 @@ router.post("/rooms/:code/join", (req, res) => {
   }
 });
 
+// Set player ready status
+router.post("/rooms/:roomId/ready", (req, res) => {
+  try {
+    const roomId = parseInt(req.params.roomId);
+    const { userId, isReady } = req.body;
+    
+    if (isNaN(roomId)) {
+      return res.status(400).json({ error: "Invalid room ID" });
+    }
+    
+    if (userId === undefined) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    if (isReady === undefined) {
+      return res.status(400).json({ error: "isReady status is required" });
+    }
+    
+    RoomService.setPlayerReady(roomId, userId, isReady);
+    
+    // Check if all players are ready
+    const allReady = RoomService.areAllPlayersReady(roomId);
+    
+    res.json({ 
+      success: true, 
+      isReady,
+      allPlayersReady: allReady
+    });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Get player ready status
+router.get("/rooms/:roomId/ready/:userId", (req, res) => {
+  try {
+    const roomId = parseInt(req.params.roomId);
+    const userId = parseInt(req.params.userId);
+    
+    if (isNaN(roomId) || isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid room or user ID" });
+    }
+    
+    const isReady = RoomService.getPlayerReadyStatus(roomId, userId);
+    
+    res.json({ isReady });
+  } catch (error: any) {
+    res.status(400).json({ error: error.message });
+  }
+});
+
+// Leave a room
+router.post("/rooms/:roomId/leave", (req, res) => {
+  try {
+    const roomId = parseInt(req.params.roomId);
+    const { userId } = req.body;
+    
+    if (isNaN(roomId)) {
+      return res.status(400).json({ error: "Invalid room ID" });
+    }
+    
+    if (!userId) {
+      return res.status(400).json({ error: "User ID is required" });
+    }
+    
+    RoomService.removeMember(roomId, userId);
+    
+    // Check if room is empty, delete it if so
+    const members = RoomService.getRoomMembers(roomId);
+    if (members.length === 0) {
+      RoomService.deleteRoom(roomId);
+      return res.json({ success: true, roomDeleted: true });
+    }
+    
+    res.json({ success: true, roomDeleted: false });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start a game
 router.post("/rooms/:roomId/start", (req, res) => {
   try {
     const roomId = parseInt(req.params.roomId);
+    
+    if (isNaN(roomId)) {
+      return res.status(400).json({ error: "Invalid room ID" });
+    }
+    
     const members = RoomService.getRoomMembers(roomId);
     
     if (members.length < 2) {
       return res.status(400).json({ error: "Need at least 2 players" });
+    }
+    
+    // Check if all players are ready
+    if (!RoomService.areAllPlayersReady(roomId)) {
+      return res.status(400).json({ error: "All players must be ready" });
     }
     
     // Assign player orders
@@ -105,6 +220,10 @@ router.get("/games/:gameId/hand/:userId", (req, res) => {
     const gameId = parseInt(req.params.gameId);
     const userId = parseInt(req.params.userId);
     
+    if (isNaN(gameId) || isNaN(userId)) {
+      return res.status(400).json({ error: "Invalid game or user ID" });
+    }
+    
     const hand = GameService.getHand(gameId, userId);
     
     if (!hand) {
@@ -122,6 +241,10 @@ router.post("/games/:gameId/play", (req, res) => {
   try {
     const gameId = parseInt(req.params.gameId);
     const { userId, card, declaredSuit } = req.body;
+    
+    if (isNaN(gameId)) {
+      return res.status(400).json({ error: "Invalid game ID" });
+    }
     
     const hand = GameService.getHand(gameId, userId);
     if (!hand) {
@@ -162,6 +285,10 @@ router.post("/games/:gameId/draw", (req, res) => {
     const gameId = parseInt(req.params.gameId);
     const { userId } = req.body;
     
+    if (isNaN(gameId)) {
+      return res.status(400).json({ error: "Invalid game ID" });
+    }
+    
     const card = GameService.drawCard(gameId, userId);
     
     if (!card) {
@@ -178,6 +305,11 @@ router.post("/games/:gameId/draw", (req, res) => {
 router.get("/games/:gameId/history", (req, res) => {
   try {
     const gameId = parseInt(req.params.gameId);
+    
+    if (isNaN(gameId)) {
+      return res.status(400).json({ error: "Invalid game ID" });
+    }
+    
     const history = GameService.getTurnHistory(gameId);
     res.json(history);
   } catch (error: any) {
