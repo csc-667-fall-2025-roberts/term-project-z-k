@@ -23,6 +23,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "bcrypt": "^6.0.0",
     "better-sqlite3": "^12.5.0",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
@@ -30,6 +31,7 @@
     "morgan": "^1.10.1"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/better-sqlite3": "^7.6.13",
     "@types/express": "^5.0.3",
     "@types/morgan": "^1.9.10",

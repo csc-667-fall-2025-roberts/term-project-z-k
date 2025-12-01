@@ -1,5 +1,6 @@
 import { db } from "../db/database";
 import { User } from "../types/database";
+import bcrypt from 'bcrypt';
 
 export class UserService {
   static createUser(username: string, email: string | null, passwordHash: string): User {
@@ -43,12 +44,35 @@ export class UserService {
   }
 
   static getAllUsers(): User[] {
-    const stmt = db.prepare("SELECT * FROM users");
+    const stmt = db.prepare(`
+        SELECT id, username, email, created_at, last_login, wins, losses, total_games
+        FROM users
+    `);
     return stmt.all() as User[];
   }
 
   static deleteUser(userId: number): void {
     const stmt = db.prepare("DELETE FROM users WHERE id = ?");
     stmt.run(userId);
+  }
+
+  static async validateLogin(usernameOrEmail: string, password: string): Promise<Omit<User, 'password_hash'> | null> {
+    const user = db.prepare(`
+        SELECT * FROM users 
+        WHERE username = ? OR email = ?
+    `).get(usernameOrEmail, usernameOrEmail) as User | undefined;
+
+    if (!user) {
+      return null;
+    }
+
+    const isValid = await bcrypt.compare(password, user.password_hash);
+
+    if (!isValid) {
+      return null;
+    }
+
+    const { password_hash, ...publicUser } = user;
+    return publicUser;
   }
 }
