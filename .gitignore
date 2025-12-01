@@ -3,3 +3,4 @@ node_modules\
 *.db
 *.sqlite
 *.sqlite3
+/node_modules
