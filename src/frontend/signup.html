@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Crazy Eights</title>
+    <link rel="stylesheet" href="css/signup.css">
+</head>
+
+<body>
+    <header>
+        <p id="title">Crazy Eights</p>
+        <p id="description">Play the classic card game online!</p>
+    </header>
+    <div id="main">
+        <div id="signup">
+            <p class="title">Sign Up</p>
+
+            <div id="error-message" class="error-message hidden"></div>
+            
+            <p>Username</p>
+            <input id="username" type="text">
+
+            <p>Email</p>
+            <input id="email" type="text">
+
+            <p>Password</p>
+            <input id="password" type="text">
+
+            <p>Confirm Password</p>
+            <input id="confirm-password" type="text">
+
+            <p><input type="checkbox">Accept our <a href="">terms of service</a></p>
+            <button id="signup-button" class="gradient-button">Sign Up</button>
+            <p>Already have an account? <a href="/login">Login here</a></p>
+        </div>
+        <div id="game-info">
+            <p>Game Info</p>
+            <ul>
+                <li>🎯 Match the top card by suit or rank</li>
+                <li>🎴 Eights are wild - change the suit!</li>
+                <li>🏆 First player to empty their hand wins</li>
+                <li>👥 Play with 2-4 players</li>
+            </ul>
+        </div>
+    </div>
+</body>
+<script src="js/signup.js"></script>
+
+</html>

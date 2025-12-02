@@ -7,6 +7,9 @@ import "./db/database";
 import rootRoutes from "./routes/root";
 import { testRouter } from "./routes/test";
 import gameRoutes from "./routes/game"; 
+import userRoutes from "./routes/user"; 
+
+import session from "express-session";
 
 const app = express();
 
@@ -15,13 +18,26 @@ const PORT = process.env.PORT || 3000;
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
-app.use(express.static(path.join("dist", "public")));
+app.use(express.static(path.join(__dirname, "../frontend")));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
+
+app.use(session({
+    secret: 'your-secret-key-change-this',  // Change this to a random string
+    resave: false,
+    saveUninitialized: false,
+    cookie: {
+        maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 days
+        httpOnly: true,
+        secure: true,
+        sameSite: 'strict'
+    }
+}));
 
 app.use("/", rootRoutes);
 app.use("/test", testRouter);
 app.use("/api/game", gameRoutes);
+app.use("/api/user", userRoutes);
 
 // 404 handler
 app.use((_request, _response, next) => {

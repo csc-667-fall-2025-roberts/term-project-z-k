@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Game Room</title>
+    <link rel="stylesheet" href="../css/game.css">
+</head>
+
+<body>
+    <header>
+        <nav>
+            <h1>Crazy Eights</h1>
+            <div id="user-nav">
+                <span>Welcome, test user</span>
+                <button id="lobby-button" class="red-button"><a href="/lobby">Back to lobby</a></button>
+            </div>
+        </nav>
+    </header>
+
+    <div id="main">
+        <div id="players">
+            <div class="player" id="player-1">
+                <span class="player-name">Player 1</span>
+                <div class="player-hand">
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                </div>
+                <span class="card-count">3 Cards</span>
+            </div>
+
+            <div class="player" id="player-2">
+                <span class="player-name">Player 2</span>
+                <div class="player-hand">
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                </div>
+                <span class="card-count">2 Cards</span>
+            </div>
+
+            <div class="player" id="player-3">
+                <span class="player-name">Player 3</span>
+                <div class="player-hand">
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                    <div class="card card-back"></div>
+                </div>
+                <span class="card-count">5 Cards</span>
+            </div>
+        </div>
+
+        <div id="house">
+            <div id="deck">
+                <div class="card card-back">
+                    <span class="deck-label">DRAW</span>
+                </div>
+                <span class="pile-label">Draw Pile</span>
+            </div>
+            <div id="field">
+                <div class="card card-hearts">
+                    <span class="card-rank">8</span>
+                    <span class="card-suit">♥</span>
+                </div>
+                <span class="pile-label">Discard Pile</span>
+            </div>
+        </div>
+
+        <div id="hand">
+            <div class="card card-hearts playable" data-suit="hearts" data-rank="7">
+                <span class="card-rank">7</span>
+                <span class="card-suit">♥</span>
+            </div>
+            <div class="card card-spades" data-suit="spades" data-rank="K">
+                <span class="card-rank">K</span>
+                <span class="card-suit">♠</span>
+            </div>
+            <div class="card card-diamonds playable" data-suit="diamonds" data-rank="8">
+                <span class="card-rank">8</span>
+                <span class="card-suit">♦</span>
+            </div>
+            <div class="card card-clubs" data-suit="clubs" data-rank="3">
+                <span class="card-rank">3</span>
+                <span class="card-suit">♣</span>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/game.js"></script>
+</body>
+
+</html>

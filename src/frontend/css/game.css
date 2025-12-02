@@ -1,0 +1,289 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+}
+
+header {
+    width: 100%;
+}
+
+nav {
+    background-color: white;
+    padding: 20px 40px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-radius: 15px;
+}
+
+nav h1 {
+    font-size: 1.8rem;
+    color: black;
+}
+
+#user-nav {
+    display: flex;
+    align-items: center;
+    gap: 15px;
+}
+
+#user-nav span {
+    font-size: 1rem;
+    color: black;
+}
+
+.red-button {
+    background-color: #f44336;
+    color: white;
+    font-weight: bold;
+    padding: 10px 20px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+}
+
+.red-button:hover {
+    background-color: #d32f2f;
+    transform: translateY(-2px);
+}
+
+.red-button a {
+    text-decoration: none;
+    color: white;
+}
+
+#main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    padding: 30px;
+    max-width: 1400px;
+    width: 100%;
+    margin: 0 auto;
+}
+
+#players {
+    display: flex;
+    justify-content: center;
+    gap: 50px;
+    margin-bottom: 30px;
+}
+
+.player {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 12px;
+}
+
+.player-name {
+    background: white;
+    padding: 8px 20px;
+    border-radius: 8px;
+    font-weight: 600;
+    color: black;
+}
+
+.player-hand {
+    display: flex;
+}
+
+.player-hand .card:first-child {
+    margin-left: 0;
+}
+
+.card-count {
+    color: white;
+    font-weight: 600;
+    font-size: 0.9rem;
+    text-shadow: 1px 1px 2px black;
+}
+
+#house {
+    display: flex;
+    justify-content: center;
+    gap: 80px;
+    align-items: center;
+    margin: 50px 0;
+}
+
+#deck,
+#field {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 15px;
+}
+
+.pile-label {
+    color: white;
+    font-weight: 600;
+    font-size: 1rem;
+    text-shadow: 1px 1px 2px black;
+}
+
+#deck .card {
+    cursor: pointer;
+    position: relative;
+}
+
+#deck .card:hover {
+    transform: translateY(-5px);
+}
+
+.deck-label {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-weight: bold;
+    font-size: 1.3rem;
+}
+
+.card {
+    width: 90px;
+    height: 130px;
+    background: white;
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    transition: all 0.3s ease;
+    cursor: pointer;
+}
+
+.card-back {
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    cursor: default;
+}
+
+.card-rank {
+    font-size: 2.2rem;
+    font-weight: bold;
+    position: absolute;
+    top: 10px;
+    left: 10px;
+}
+
+.card-suit {
+    font-size: 3.5rem;
+}
+
+.card-hearts .card-rank,
+.card-hearts .card-suit,
+.card-diamonds .card-rank,
+.card-diamonds .card-suit {
+    color: #e53935;
+}
+
+.card-spades .card-rank,
+.card-spades .card-suit,
+.card-clubs .card-rank,
+.card-clubs .card-suit {
+    color: #212121;
+}
+
+#hand {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin-top: auto;
+}
+
+#hand .card {
+    transition: all 0.3s ease;
+}
+
+#hand .card:hover {
+    transform: translateY(-25px);
+}
+
+#hand .card.playable {
+    border: 3px solid #4caf50;
+    cursor: pointer;
+}
+
+#hand .card.playable:hover {
+    transform: translateY(-30px) scale(1.05);
+}
+
+#hand .card:not(.playable) {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+#hand .card:not(.playable):hover {
+    transform: translateY(-10px);
+}
+
+@media (max-width: 1024px) {
+    #players {
+        gap: 30px;
+    }
+
+    #house {
+        gap: 50px;
+    }
+
+    .card {
+        width: 75px;
+        height: 110px;
+    }
+
+    .card-rank {
+        font-size: 1.8rem;
+        top: 8px;
+        left: 8px;
+    }
+
+    .card-suit {
+        font-size: 3rem;
+    }
+}
+
+@media (max-width: 768px) {
+    #players {
+        flex-wrap: wrap;
+        gap: 20px;
+    }
+
+    #house {
+        gap: 30px;
+    }
+
+    .card {
+        width: 65px;
+        height: 95px;
+    }
+
+    .card-rank {
+        font-size: 1.5rem;
+        top: 5px;
+        left: 5px;
+    }
+
+    .card-suit {
+        font-size: 2.5rem;
+    }
+
+    #hand {
+        gap: 10px;
+        padding: 20px;
+    }
+}
