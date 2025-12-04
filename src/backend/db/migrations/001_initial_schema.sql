@@ -110,6 +110,13 @@ CREATE TABLE IF NOT EXISTS migrations (
     executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS session (
+  sid varchar NOT NULL COLLATE "default",
+  sess json NOT NULL,
+  expire timestamp(6) NOT NULL,
+  CONSTRAINT session_pkey PRIMARY KEY (sid)
+);
+
 -- Create indexes
 CREATE INDEX IF NOT EXISTS idx_room_members_room ON room_members(room_id);
 CREATE INDEX IF NOT EXISTS idx_room_members_user ON room_members(user_id);
@@ -120,3 +127,4 @@ CREATE INDEX IF NOT EXISTS idx_chat_room ON chat_messages(room_id);
 CREATE INDEX IF NOT EXISTS idx_games_status ON games(status);
 CREATE INDEX IF NOT EXISTS idx_rooms_status ON rooms(status);
 CREATE INDEX IF NOT EXISTS idx_hands_user ON hands(user_id);
+CREATE INDEX IF NOT EXISTS IDX_session_expire ON session (expire);

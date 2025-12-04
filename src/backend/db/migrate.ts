@@ -24,14 +24,19 @@ async function getExecutedMigrations(pool: Pool): Promise<string[]> {
   return result.rows.map((row: any) => row.name);
 }
 
-// Get all migration files
-function getMigrationFiles(): string[] {
+function getMigrationFiles(direction: 'up' | 'down'): string[] {
   if (!fs.existsSync(MIGRATIONS_DIR)) {
     return [];
   }
   
   const files = fs.readdirSync(MIGRATIONS_DIR)
-    .filter(file => file.endsWith('.sql'))
+    .filter(file => {
+      if (direction === 'up') {
+        return file.endsWith('.sql') && !file.includes('_down');
+      } else {
+        return file.endsWith('_down.sql');
+      }
+    })
     .sort();
   
   return files;
@@ -86,7 +91,7 @@ async function runMigrations(direction: 'up' | 'down') {
   try {
     await createMigrationsTable(pool);
     const executedMigrations = await getExecutedMigrations(pool);
-    const migrationFiles = getMigrationFiles();
+    const migrationFiles = getMigrationFiles(direction);
     
     if (direction === 'up') {
       // Apply pending migrations

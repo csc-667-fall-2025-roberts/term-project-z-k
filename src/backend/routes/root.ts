@@ -1,18 +1,18 @@
 import express from "express";
 import path from 'path';
-import { auth } from "../middleware/auth";
+import { auth, loggedIn } from "../middleware/auth";
 
 const router = express.Router();
 
-router.get("/", auth, (request, response) => {
-  response.render("root", { gamesListing: ["a", "b", "c", "etc"] });
+router.get("/", (request, response) => {
+  response.redirect('/signup')
 });
 
-router.get("/signup", (req, res) => {
+router.get("/signup", loggedIn, (req, res) => {
   res.sendFile(path.join(__dirname, "../../frontend/signup.html"));
 });
 
-router.get("/login", (req, res) => {
+router.get("/login", loggedIn, (req, res) => {
   res.sendFile(path.join(__dirname, "../../frontend/login.html"));
 });
 
@@ -20,12 +20,12 @@ router.get("/lobby", auth, (req, res) => {
   res.sendFile(path.join(__dirname, "../../frontend/lobby.html"));
 });
 
-router.get("/game/:id", (req, res) => {
+router.get("/game/rooms/:id", auth, (req, res) => {
     res.sendFile(path.join(__dirname, "../../frontend/game.html"));
 });
 
-router.get("/error", (req, res) => {
-  res.sendFile(path.join(__dirname, "../../frontend/error.html"));
+router.use((req, res) => {
+  res.status(404).sendFile(path.join(__dirname, "../../frontend/error.html"));
 });
 
 export default router;

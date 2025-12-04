@@ -13,7 +13,7 @@
         <nav>
             <h1>Crazy Eights Lobby</h1>
             <div id="user-nav">
-                <span>Welcome, test user</span>
+                <span id="welcome"></span>
                 <button id="logout" class="red-button">Logout</button>
             </div>
         </nav>
@@ -23,22 +23,22 @@
             <h2>Create A Room</h2>
             <div class="form">
                 <span>Room Name</span>
-                <input type="text" placeholder="Room name">
+                <input id="room-name" type="text" placeholder="Room name">
             </div>
             <div class="form">
                 <label>Max Players</label>
-                <select>
+                <select id="max-players">
                     <option value="2">2 Players</option>
                     <option value="3">3 Players</option>
                     <option value="4" selected>4 Players</option>
                 </select>
             </div>
             <span>
-                <input type="checkbox" name="" id="">
+                <input id="private-room" type="checkbox" name="" id="">
                 <span>Private Room</span>
             </span>
             <div>
-                <button class="gradient-button">Create Room</button>
+                <button id="create-room-button" class="gradient-button">Create Room</button>
             </div>
         </div>
         <div id="rooms">
@@ -48,170 +48,11 @@
                 <button>Waiting</button>
                 <button>In Progress</button>
             </div>
-            <div id="games">
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Test Game</div>
-                        <div class="game-details">
-                            <span class="players">👥 2/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Friday Night Games</div>
-                        <div class="game-details">
-                            <span class="players">👥 3/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Pro Players Only</div>
-                        <div class="game-details">
-                            <span class="players">👥 4/4 players</span>
-                            <span class="status">⏳ In Progress</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button" disabled>Full</button>
-                </div>
-                                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Test Game</div>
-                        <div class="game-details">
-                            <span class="players">👥 2/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Friday Night Games</div>
-                        <div class="game-details">
-                            <span class="players">👥 3/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Pro Players Only</div>
-                        <div class="game-details">
-                            <span class="players">👥 4/4 players</span>
-                            <span class="status">⏳ In Progress</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button" disabled>Full</button>
-                </div>
-                                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Test Game</div>
-                        <div class="game-details">
-                            <span class="players">👥 2/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Friday Night Games</div>
-                        <div class="game-details">
-                            <span class="players">👥 3/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Pro Players Only</div>
-                        <div class="game-details">
-                            <span class="players">👥 4/4 players</span>
-                            <span class="status">⏳ In Progress</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button" disabled>Full</button>
-                </div>
-                                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Test Game</div>
-                        <div class="game-details">
-                            <span class="players">👥 2/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Friday Night Games</div>
-                        <div class="game-details">
-                            <span class="players">👥 3/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Pro Players Only</div>
-                        <div class="game-details">
-                            <span class="players">👥 4/4 players</span>
-                            <span class="status">⏳ In Progress</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button" disabled>Full</button>
-                </div>
-                                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Test Game</div>
-                        <div class="game-details">
-                            <span class="players">👥 2/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Friday Night Games</div>
-                        <div class="game-details">
-                            <span class="players">👥 3/4 players</span>
-                            <span class="status">🎮 Waiting</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button">Join</button>
-                </div>
-
-                <div class="game">
-                    <div class="game-info">
-                        <div class="game-name">Pro Players Only</div>
-                        <div class="game-details">
-                            <span class="players">👥 4/4 players</span>
-                            <span class="status">⏳ In Progress</span>
-                        </div>
-                    </div>
-                    <button class="gradient-button" disabled>Full</button>
-                </div>
-            </div>
+            <div id="games"></div>
         </div>
     </div>
 </body>
+
+<script src="js/lobby.js"></script>
 
 </html>

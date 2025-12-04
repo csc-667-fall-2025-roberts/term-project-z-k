@@ -6,14 +6,43 @@ import "./db/database";
 
 import rootRoutes from "./routes/root";
 import { testRouter } from "./routes/test";
-import gameRoutes from "./routes/game"; 
-import userRoutes from "./routes/user"; 
+import gameRoutes from "./routes/game";
+import userRoutes from "./routes/user";
 
 import session from "express-session";
+import connectPgSimple from 'connect-pg-simple';
+import pg from 'pg';
 
 const app = express();
 
 const PORT = process.env.PORT || 3000;
+
+const PgStore = connectPgSimple(session);
+
+const pgPool = new pg.Pool({
+  user: process.env.DB_USER || 'postgres',
+  host: process.env.DB_HOST || 'localhost',
+  database: process.env.DB_NAME || 'crazy_eights',
+  password: process.env.DB_PASSWORD || 'postgres',
+  port: parseInt(process.env.DB_PORT || '5432'),
+});
+
+// Configure the session middleware
+app.use(session({
+  store: new PgStore({
+    pool: pgPool,
+    tableName: 'session', // Name of your session table
+  }),
+  secret: 'testtestset', // Replace with a strong, unique secret
+  resave: false,
+  saveUninitialized: false,
+  cookie: {
+    maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
+    secure: false, // Set to true in production with HTTPS
+    httpOnly: true,
+    sameSite: 'lax',
+  },
+}));
 
 app.use(morgan("dev"));
 app.use(express.json());
@@ -22,27 +51,10 @@ app.use(express.static(path.join(__dirname, "../frontend")));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
-app.use(session({
-    secret: 'your-secret-key-change-this',  // Change this to a random string
-    resave: false,
-    saveUninitialized: false,
-    cookie: {
-        maxAge: 7 * 24 * 60 * 60 * 1000,  // 7 days
-        httpOnly: true,
-        secure: true,
-        sameSite: 'strict'
-    }
-}));
-
-app.use("/", rootRoutes);
 app.use("/test", testRouter);
 app.use("/api/game", gameRoutes);
 app.use("/api/user", userRoutes);
-
-// 404 handler
-app.use((_request, _response, next) => {
-  next(createHttpError(404));
-});
+app.use("/", rootRoutes);
 
 
 

@@ -8,13 +8,14 @@ const router = express.Router();
 // Create a new room
 router.post('/rooms', async (req, res) => {
   try {
-    const { name, hostId, maxPlayers, isPrivate } = req.body;
+    const { name, maxPlayers, isPrivate } = req.body;
+    const hostId = Number(req.session.userId);
     const room = await RoomService.createRoom(name, hostId, maxPlayers, isPrivate);
     
     // Auto-join the host
     await RoomService.addMember(room.id, hostId);
     
-    res.json(room);
+    res.status(201).json(room);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
   }
