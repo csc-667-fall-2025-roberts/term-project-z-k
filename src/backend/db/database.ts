@@ -1,37 +1,71 @@
-import Database from "better-sqlite3";
-import * as path from "path";
-import * as fs from "fs";
+import { Pool, PoolClient } from 'pg';
+import * as fs from 'fs';
+import * as path from 'path';
+import * as dotenv from 'dotenv';
 
-const DB_PATH = path.join(__dirname, "../../../", "crazy_eights.db");
-const SCHEMA_PATH = path.join(__dirname, "schema.sql");
+dotenv.config();
+
+const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
 
 class DatabaseManager {
-  private db: Database.Database;
+  private pool: Pool;
 
   constructor() {
-    this.db = new Database(DB_PATH);
-    this.db.pragma("foreign_keys = ON");
-    this.initialize();
+    this.pool = new Pool({
+      user: process.env.DB_USER || 'postgres',
+      host: process.env.DB_HOST || 'localhost',
+      database: process.env.DB_NAME || 'crazy_eights',
+      password: process.env.DB_PASSWORD || 'postgres',
+      port: parseInt(process.env.DB_PORT || '5432'),
+      max: 20,
+      idleTimeoutMillis: 30000,
+      connectionTimeoutMillis: 2000,
+    });
+
+    this.pool.on('error', (err) => {
+      console.error('Unexpected error on idle client', err);
+    });
   }
 
-  private initialize() {
-    // Read and execute schema
-    const schema = fs.readFileSync(SCHEMA_PATH, "utf-8");
-    this.db.exec(schema);
-    console.log("Database initialized successfully");
+  async initialize() {
+    try {
+      const schema = fs.readFileSync(SCHEMA_PATH, 'utf-8');
+      await this.pool.query(schema);
+      console.log('Database initialized successfully');
+    } catch (error) {
+      console.error('Error initializing database:', error);
+      throw error;
+    }
   }
 
-  getDb(): Database.Database {
-    return this.db;
+  getPool(): Pool {
+    return this.pool;
   }
 
-  close() {
-    this.db.close();
+  async query(text: string, params?: any[]) {
+    return await this.pool.query(text, params);
+  }
+
+  async getClient(): Promise<PoolClient> {
+    return await this.pool.connect();
+  }
+
+  async close() {
+    await this.pool.end();
   }
 }
 
 // Singleton instance
 const dbManager = new DatabaseManager();
-export const db = dbManager.getDb();
 
+// Initialize immediately
+(async () => {
+  try {
+    await dbManager.initialize();
+  } catch (error) {
+    console.error('Failed to initialize database:', error);
+  }
+})();
+
+export const db = dbManager.getPool();
 export default dbManager;

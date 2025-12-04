@@ -1,18 +1,18 @@
-import express from 'express';
-import { UserService } from '../services/userService';
-import { RoomService } from '../services/roomService';
-import { GameService } from '../services/gameService';
+import express from "express";
+import { UserService } from "../services/userService";
+import { RoomService } from "../services/roomService";
+import { GameService } from "../services/gameService";
 
 const router = express.Router();
 
 // Create a new room
-router.post('/rooms', async (req, res) => {
+router.post("/rooms", (req, res) => {
   try {
     const { name, hostId, maxPlayers, isPrivate } = req.body;
-    const room = await RoomService.createRoom(name, hostId, maxPlayers, isPrivate);
+    const room = RoomService.createRoom(name, hostId, maxPlayers, isPrivate);
     
     // Auto-join the host
-    await RoomService.addMember(room.id, hostId);
+    RoomService.addMember(room.id, hostId);
     
     res.json(room);
   } catch (error: any) {
@@ -21,9 +21,9 @@ router.post('/rooms', async (req, res) => {
 });
 
 // Get available rooms
-router.get('/rooms', async (_req, res) => {
+router.get("/rooms", (_req, res) => {
   try {
-    const rooms = await RoomService.getAvailableRooms();
+    const rooms = RoomService.getAvailableRooms();
     res.json(rooms);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -31,18 +31,18 @@ router.get('/rooms', async (_req, res) => {
 });
 
 // Get a specific room with members
-router.get('/rooms/:roomId', async (req, res) => {
+router.get("/rooms/:roomId", (req, res) => {
   try {
     const roomId = parseInt(req.params.roomId);
     
     if (isNaN(roomId)) {
-      return res.status(400).json({ error: 'Invalid room ID' });
+      return res.status(400).json({ error: "Invalid room ID" });
     }
     
-    const room = await RoomService.getRoomWithMembers(roomId);
+    const room = RoomService.getRoomWithMembers(roomId);
     
     if (!room) {
-      return res.status(404).json({ error: 'Room not found' });
+      return res.status(404).json({ error: "Room not found" });
     }
     
     res.json(room);
@@ -52,26 +52,26 @@ router.get('/rooms/:roomId', async (req, res) => {
 });
 
 // Join a room by code
-router.post('/rooms/:code/join', async (req, res) => {
+router.post("/rooms/:code/join", (req, res) => {
   try {
     const { code } = req.params;
     const { userId } = req.body;
     
     if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
+      return res.status(400).json({ error: "User ID is required" });
     }
     
-    const room = await RoomService.getRoomByCode(code);
+    const room = RoomService.getRoomByCode(code);
     if (!room) {
-      return res.status(404).json({ error: 'Room not found' });
+      return res.status(404).json({ error: "Room not found" });
     }
     
-    if (await RoomService.isRoomFull(room.id)) {
-      return res.status(400).json({ error: 'Room is full' });
+    if (RoomService.isRoomFull(room.id)) {
+      return res.status(400).json({ error: "Room is full" });
     }
     
-    await RoomService.addMember(room.id, userId);
-    const roomWithMembers = await RoomService.getRoomWithMembers(room.id);
+    RoomService.addMember(room.id, userId);
+    const roomWithMembers = RoomService.getRoomWithMembers(room.id);
     
     res.json(roomWithMembers);
   } catch (error: any) {
@@ -80,27 +80,27 @@ router.post('/rooms/:code/join', async (req, res) => {
 });
 
 // Set player ready status
-router.post('/rooms/:roomId/ready', async (req, res) => {
+router.post("/rooms/:roomId/ready", (req, res) => {
   try {
     const roomId = parseInt(req.params.roomId);
     const { userId, isReady } = req.body;
     
     if (isNaN(roomId)) {
-      return res.status(400).json({ error: 'Invalid room ID' });
+      return res.status(400).json({ error: "Invalid room ID" });
     }
     
     if (userId === undefined) {
-      return res.status(400).json({ error: 'User ID is required' });
+      return res.status(400).json({ error: "User ID is required" });
     }
     
     if (isReady === undefined) {
-      return res.status(400).json({ error: 'isReady status is required' });
+      return res.status(400).json({ error: "isReady status is required" });
     }
     
-    await RoomService.setPlayerReady(roomId, userId, isReady);
+    RoomService.setPlayerReady(roomId, userId, isReady);
     
     // Check if all players are ready
-    const allReady = await RoomService.areAllPlayersReady(roomId);
+    const allReady = RoomService.areAllPlayersReady(roomId);
     
     res.json({ 
       success: true, 
@@ -113,16 +113,16 @@ router.post('/rooms/:roomId/ready', async (req, res) => {
 });
 
 // Get player ready status
-router.get('/rooms/:roomId/ready/:userId', async (req, res) => {
+router.get("/rooms/:roomId/ready/:userId", (req, res) => {
   try {
     const roomId = parseInt(req.params.roomId);
     const userId = parseInt(req.params.userId);
     
     if (isNaN(roomId) || isNaN(userId)) {
-      return res.status(400).json({ error: 'Invalid room or user ID' });
+      return res.status(400).json({ error: "Invalid room or user ID" });
     }
     
-    const isReady = await RoomService.getPlayerReadyStatus(roomId, userId);
+    const isReady = RoomService.getPlayerReadyStatus(roomId, userId);
     
     res.json({ isReady });
   } catch (error: any) {
@@ -131,25 +131,25 @@ router.get('/rooms/:roomId/ready/:userId', async (req, res) => {
 });
 
 // Leave a room
-router.post('/rooms/:roomId/leave', async (req, res) => {
+router.post("/rooms/:roomId/leave", (req, res) => {
   try {
     const roomId = parseInt(req.params.roomId);
     const { userId } = req.body;
     
     if (isNaN(roomId)) {
-      return res.status(400).json({ error: 'Invalid room ID' });
+      return res.status(400).json({ error: "Invalid room ID" });
     }
     
     if (!userId) {
-      return res.status(400).json({ error: 'User ID is required' });
+      return res.status(400).json({ error: "User ID is required" });
     }
     
-    await RoomService.removeMember(roomId, userId);
+    RoomService.removeMember(roomId, userId);
     
     // Check if room is empty, delete it if so
-    const members = await RoomService.getRoomMembers(roomId);
+    const members = RoomService.getRoomMembers(roomId);
     if (members.length === 0) {
-      await RoomService.deleteRoom(roomId);
+      RoomService.deleteRoom(roomId);
       return res.json({ success: true, roomDeleted: true });
     }
     
@@ -160,32 +160,32 @@ router.post('/rooms/:roomId/leave', async (req, res) => {
 });
 
 // Start a game
-router.post('/rooms/:roomId/start', async (req, res) => {
+router.post("/rooms/:roomId/start", (req, res) => {
   try {
     const roomId = parseInt(req.params.roomId);
     
     if (isNaN(roomId)) {
-      return res.status(400).json({ error: 'Invalid room ID' });
+      return res.status(400).json({ error: "Invalid room ID" });
     }
     
-    const members = await RoomService.getRoomMembers(roomId);
+    const members = RoomService.getRoomMembers(roomId);
     
     if (members.length < 2) {
-      return res.status(400).json({ error: 'Need at least 2 players' });
+      return res.status(400).json({ error: "Need at least 2 players" });
     }
     
     // Check if all players are ready
-    if (!(await RoomService.areAllPlayersReady(roomId))) {
-      return res.status(400).json({ error: 'All players must be ready' });
+    if (!RoomService.areAllPlayersReady(roomId)) {
+      return res.status(400).json({ error: "All players must be ready" });
     }
     
     // Assign player orders
-    await RoomService.assignPlayerOrders(roomId);
-    await RoomService.updateRoomStatus(roomId, 'in_progress');
+    RoomService.assignPlayerOrders(roomId);
+    RoomService.updateRoomStatus(roomId, "in_progress");
     
     // Create game
     const playerIds = members.map(m => m.user_id);
-    const game = await GameService.createGame(roomId, playerIds);
+    const game = GameService.createGame(roomId, playerIds);
     
     res.json(game);
   } catch (error: any) {
@@ -194,18 +194,18 @@ router.post('/rooms/:roomId/start', async (req, res) => {
 });
 
 // Get game state
-router.get('/games/:gameId', async (req, res) => {
+router.get("/games/:gameId", (req, res) => {
   try {
     const gameId = parseInt(req.params.gameId);
     
     if (isNaN(gameId)) {
-      return res.status(400).json({ error: 'Invalid game ID' });
+      return res.status(400).json({ error: "Invalid game ID" });
     }
 
-    const gameState = await GameService.getGameState(gameId);
+    const gameState = GameService.getGameState(gameId);
     
     if (!gameState) {
-      return res.status(404).json({ error: 'Game not found' });
+      return res.status(404).json({ error: "Game not found" });
     }
     
     res.json(gameState);
@@ -215,19 +215,19 @@ router.get('/games/:gameId', async (req, res) => {
 });
 
 // Get player's hand
-router.get('/games/:gameId/hand/:userId', async (req, res) => {
+router.get("/games/:gameId/hand/:userId", (req, res) => {
   try {
     const gameId = parseInt(req.params.gameId);
     const userId = parseInt(req.params.userId);
     
     if (isNaN(gameId) || isNaN(userId)) {
-      return res.status(400).json({ error: 'Invalid game or user ID' });
+      return res.status(400).json({ error: "Invalid game or user ID" });
     }
     
-    const hand = await GameService.getHand(gameId, userId);
+    const hand = GameService.getHand(gameId, userId);
     
     if (!hand) {
-      return res.status(404).json({ error: 'Hand not found' });
+      return res.status(404).json({ error: "Hand not found" });
     }
     
     res.json(JSON.parse(hand.cards));
@@ -237,18 +237,18 @@ router.get('/games/:gameId/hand/:userId', async (req, res) => {
 });
 
 // Play a card
-router.post('/games/:gameId/play', async (req, res) => {
+router.post("/games/:gameId/play", (req, res) => {
   try {
     const gameId = parseInt(req.params.gameId);
     const { userId, card, declaredSuit } = req.body;
     
     if (isNaN(gameId)) {
-      return res.status(400).json({ error: 'Invalid game ID' });
+      return res.status(400).json({ error: "Invalid game ID" });
     }
     
-    const hand = await GameService.getHand(gameId, userId);
+    const hand = GameService.getHand(gameId, userId);
     if (!hand) {
-      return res.status(404).json({ error: 'Hand not found' });
+      return res.status(404).json({ error: "Hand not found" });
     }
     
     const cards = JSON.parse(hand.cards);
@@ -257,20 +257,20 @@ router.post('/games/:gameId/play', async (req, res) => {
     );
     
     if (cardIndex === -1) {
-      return res.status(400).json({ error: 'Card not in hand' });
+      return res.status(400).json({ error: "Card not in hand" });
     }
     
     // Remove card from hand
     cards.splice(cardIndex, 1);
-    await GameService.updateHand(gameId, userId, cards);
+    GameService.updateHand(gameId, userId, cards);
     
     // Play the card
-    await GameService.playCard(gameId, userId, card, declaredSuit);
+    GameService.playCard(gameId, userId, card, declaredSuit);
     
     // Check for winner
     if (cards.length === 0) {
-      await GameService.finishGame(gameId, userId);
-      await UserService.updateStats(userId, true);
+      GameService.finishGame(gameId, userId);
+      UserService.updateStats(userId, true);
     }
     
     res.json({ success: true });
@@ -280,19 +280,19 @@ router.post('/games/:gameId/play', async (req, res) => {
 });
 
 // Draw a card
-router.post('/games/:gameId/draw', async (req, res) => {
+router.post("/games/:gameId/draw", (req, res) => {
   try {
     const gameId = parseInt(req.params.gameId);
     const { userId } = req.body;
     
     if (isNaN(gameId)) {
-      return res.status(400).json({ error: 'Invalid game ID' });
+      return res.status(400).json({ error: "Invalid game ID" });
     }
     
-    const card = await GameService.drawCard(gameId, userId);
+    const card = GameService.drawCard(gameId, userId);
     
     if (!card) {
-      return res.status(400).json({ error: 'Deck is empty' });
+      return res.status(400).json({ error: "Deck is empty" });
     }
     
     res.json(card);
@@ -302,15 +302,15 @@ router.post('/games/:gameId/draw', async (req, res) => {
 });
 
 // Get turn history
-router.get('/games/:gameId/history', async (req, res) => {
+router.get("/games/:gameId/history", (req, res) => {
   try {
     const gameId = parseInt(req.params.gameId);
     
     if (isNaN(gameId)) {
-      return res.status(400).json({ error: 'Invalid game ID' });
+      return res.status(400).json({ error: "Invalid game ID" });
     }
     
-    const history = await GameService.getTurnHistory(gameId);
+    const history = GameService.getTurnHistory(gameId);
     res.json(history);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

@@ -3,64 +3,72 @@ import { User } from "../types/database";
 import bcrypt from 'bcrypt';
 
 export class UserService {
-  static createUser(username: string, email: string | null, passwordHash: string): User {
-    const stmt = db.prepare(`
-      INSERT INTO users (username, email, password_hash)
-      VALUES (?, ?, ?)
-    `);
-
-    const result = stmt.run(username, email, passwordHash);
-    return this.getUserById(result.lastInsertRowid as number)!;
+  static async createUser(username: string, email: string | null, passwordHash: string): Promise<User> {
+    const result = await db.query(
+      `INSERT INTO users (username, email, password_hash)
+       VALUES ($1, $2, $3)
+       RETURNING *`,
+      [username, email, passwordHash]
+    );
+    return result.rows[0] as User;
   }
 
-  static getUserById(id: number): User | undefined {
-    const stmt = db.prepare("SELECT * FROM users WHERE id = ?");
-    return stmt.get(id) as User | undefined;
+  static async getUserById(id: number): Promise<User | undefined> {
+    const result = await db.query(
+      'SELECT * FROM users WHERE id = $1',
+      [id]
+    );
+    return result.rows[0] as User | undefined;
   }
 
-  static getUserByUsername(username: string): User | undefined {
-    const stmt = db.prepare("SELECT * FROM users WHERE username = ?");
-    return stmt.get(username) as User | undefined;
+  static async getUserByUsername(username: string): Promise<User | undefined> {
+    const result = await db.query(
+      'SELECT * FROM users WHERE username = $1',
+      [username]
+    );
+    return result.rows[0] as User | undefined;
   }
 
-  static updateLastLogin(userId: number): void {
-    const stmt = db.prepare(`
-      UPDATE users
-      SET last_login = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-    stmt.run(userId);
+  static async updateLastLogin(userId: number): Promise<void> {
+    await db.query(
+      `UPDATE users
+       SET last_login = CURRENT_TIMESTAMP
+       WHERE id = $1`,
+      [userId]
+    );
   }
 
-  static updateStats(userId: number, won: boolean): void {
-    const stmt = db.prepare(`
-      UPDATE users
-      SET wins = wins + ?,
-          losses = losses + ?,
-          total_games = total_games + 1
-      WHERE id = ?
-    `);
-    stmt.run(won ? 1 : 0, won ? 0 : 1, userId);
+  static async updateStats(userId: number, won: boolean): Promise<void> {
+    await db.query(
+      `UPDATE users
+       SET wins = wins + $1,
+           losses = losses + $2,
+           total_games = total_games + 1
+       WHERE id = $3`,
+      [won ? 1 : 0, won ? 0 : 1, userId]
+    );
   }
 
-  static getAllUsers(): User[] {
-    const stmt = db.prepare(`
-        SELECT id, username, email, created_at, last_login, wins, losses, total_games
-        FROM users
-    `);
-    return stmt.all() as User[];
+  static async getAllUsers(): Promise<User[]> {
+    const result = await db.query(
+      `SELECT id, username, email, created_at, last_login, wins, losses, total_games
+       FROM users`
+    );
+    return result.rows as User[];
   }
 
-  static deleteUser(userId: number): void {
-    const stmt = db.prepare("DELETE FROM users WHERE id = ?");
-    stmt.run(userId);
+  static async deleteUser(userId: number): Promise<void> {
+    await db.query('DELETE FROM users WHERE id = $1', [userId]);
   }
 
   static async validateLogin(usernameOrEmail: string, password: string): Promise<Omit<User, 'password_hash'> | null> {
-    const user = db.prepare(`
-        SELECT * FROM users 
-        WHERE username = ? OR email = ?
-    `).get(usernameOrEmail, usernameOrEmail) as User | undefined;
+    const result = await db.query(
+      `SELECT * FROM users 
+       WHERE username = $1 OR email = $1`,
+      [usernameOrEmail]
+    );
+
+    const user = result.rows[0] as User | undefined;
 
     if (!user) {
       return null;

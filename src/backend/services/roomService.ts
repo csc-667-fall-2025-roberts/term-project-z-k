@@ -11,196 +11,161 @@ export class RoomService {
     return code;
   }
 
-  static createRoom(name: string, hostId: number, maxPlayers = 4, isPrivate = false): Room {
+  static async createRoom(name: string, hostId: number, maxPlayers = 4, isPrivate = false): Promise<Room> {
     let code = this.generateRoomCode();
     
     // Ensure unique code
-    while (this.getRoomByCode(code)) {
+    while (await this.getRoomByCode(code)) {
       code = this.generateRoomCode();
     }
 
-    const stmt = db.prepare(`
-      INSERT INTO rooms (name, code, host_id, max_players, is_private)
-      VALUES (?, ?, ?, ?, ?)
-    `)
+    const result = await db.query(
+      `INSERT INTO rooms (name, code, host_id, max_players, is_private)
+       VALUES ($1, $2, $3, $4, $5)
+       RETURNING *`,
+      [name, code, hostId, maxPlayers, isPrivate]
+    );
     
-    const result = stmt.run(name, code, hostId, maxPlayers, isPrivate ? 1 : 0);
-    return this.getRoomById(result.lastInsertRowid as number)!;
+    return result.rows[0] as Room;
   }
   
-  static setPlayerReady(roomId: number, userId: number, isReady: boolean): void {
-    const stmt = db.prepare(`
-      UPDATE room_members
-      SET is_ready = ?
-      WHERE room_id = ? AND user_id = ?
-    `);
+  static async setPlayerReady(roomId: number, userId: number, isReady: boolean): Promise<void> {
+    const result = await db.query(
+      `UPDATE room_members
+       SET is_ready = $1
+       WHERE room_id = $2 AND user_id = $3`,
+      [isReady, roomId, userId]
+    );
     
-    const result = stmt.run(isReady ? 1 : 0, roomId, userId);
-    
-    // Check if the update actually affected any rows
-    if (result.changes === 0) {
+    if (result.rowCount === 0) {
       throw new Error(`User ${userId} is not a member of room ${roomId}`);
     }
   }
 
-  static getPlayerReadyStatus(roomId: number, userId: number): boolean {
-    const stmt = db.prepare(`
-      SELECT is_ready FROM room_members
-      WHERE room_id = ? AND user_id = ?
-    `);
+  static async getPlayerReadyStatus(roomId: number, userId: number): Promise<boolean> {
+    const result = await db.query(
+      `SELECT is_ready FROM room_members
+       WHERE room_id = $1 AND user_id = $2`,
+      [roomId, userId]
+    );
     
-    const member = stmt.get(roomId, userId) as { is_ready: number } | undefined;
-    
-    if (!member) {
+    if (result.rows.length === 0) {
       throw new Error(`User ${userId} is not a member of room ${roomId}`);
     }
     
-    return member.is_ready === 1;
+    return result.rows[0].is_ready;
   }
 
-  static areAllPlayersReady(roomId: number): boolean {
-    const stmt = db.prepare(`
-      SELECT COUNT(*) as total, SUM(is_ready) as ready
-      FROM room_members
-      WHERE room_id = ?
-    `);
+  static async areAllPlayersReady(roomId: number): Promise<boolean> {
+    const result = await db.query(
+      `SELECT COUNT(*) as total, SUM(CASE WHEN is_ready THEN 1 ELSE 0 END) as ready
+       FROM room_members
+       WHERE room_id = $1`,
+      [roomId]
+    );
     
-    const result = stmt.get(roomId) as { total: number; ready: number | null };
+    const { total, ready } = result.rows[0];
     
     // Need at least 2 players and all must be ready
-    return result.total >= 2 && result.ready === result.total;
+    return parseInt(total) >= 2 && parseInt(ready) === parseInt(total);
   }
 
-  static getRoomById(id: number): Room | undefined {
-    const stmt = db.prepare("SELECT * FROM rooms WHERE id = ?");
-    const room = stmt.get(id) as Room | undefined;
-    
-    // Convert SQLite integers to booleans
-    if (room) {
-      room.is_private = Boolean(room.is_private);
-    }
-    
-    return room;
+  static async getRoomById(id: number): Promise<Room | undefined> {
+    const result = await db.query('SELECT * FROM rooms WHERE id = $1', [id]);
+    return result.rows[0] as Room | undefined;
   }
 
-  static getRoomByCode(code: string): Room | undefined {
-    const stmt = db.prepare("SELECT * FROM rooms WHERE code = ?");
-    const room = stmt.get(code) as Room | undefined;
-    
-    if (room) {
-      room.is_private = Boolean(room.is_private);
-    }
-    
-    return room;
+  static async getRoomByCode(code: string): Promise<Room | undefined> {
+    const result = await db.query('SELECT * FROM rooms WHERE code = $1', [code]);
+    return result.rows[0] as Room | undefined;
   }
 
-  static getRoomWithMembers(roomId: number): RoomWithMembers | undefined {
-    const room = this.getRoomById(roomId);
+  static async getRoomWithMembers(roomId: number): Promise<RoomWithMembers | undefined> {
+    const room = await this.getRoomById(roomId);
     if (!room) return undefined;
 
-    const stmt = db.prepare(`
-      SELECT rm.*, u.username
-      FROM room_members rm
-      JOIN users u ON rm.user_id = u.id
-      WHERE rm.room_id = ?
-      ORDER BY rm.joined_at
-    `);
+    const result = await db.query(
+      `SELECT rm.*, u.username
+       FROM room_members rm
+       JOIN users u ON rm.user_id = u.id
+       WHERE rm.room_id = $1
+       ORDER BY rm.joined_at`,
+      [roomId]
+    );
 
-    const members = stmt.all(roomId) as (RoomMember & { username: string })[];
-    
-    // Convert is_ready from integer to boolean
-    members.forEach(member => {
-      member.is_ready = Boolean(member.is_ready);
-    });
+    const members = result.rows as (RoomMember & { username: string })[];
     
     return { ...room, members };
   }
 
-  static getAvailableRooms(): Room[] {
-    const stmt = db.prepare(`
-      SELECT r.* FROM rooms r
-      WHERE r.status = 'waiting'
-      AND r.is_private = 0
-      AND (SELECT COUNT(*) FROM room_members WHERE room_id = r.id) < r.max_players
-      ORDER BY r.created_at DESC
-    `);
+  static async getAvailableRooms(): Promise<Room[]> {
+    const result = await db.query(
+      `SELECT r.* FROM rooms r
+       WHERE r.status = 'waiting'
+       AND r.is_private = false
+       AND (SELECT COUNT(*) FROM room_members WHERE room_id = r.id) < r.max_players
+       ORDER BY r.created_at DESC`
+    );
     
-    const rooms = stmt.all() as Room[];
-    
-    // Convert is_private from integer to boolean
-    rooms.forEach(room => {
-      room.is_private = Boolean(room.is_private);
-    });
-    
-    return rooms;
+    return result.rows as Room[];
   }
 
-  static updateRoomStatus(roomId: number, status: Room["status"]): void {
-    const stmt = db.prepare("UPDATE rooms SET status = ? WHERE id = ?");
-    stmt.run(status, roomId);
+  static async updateRoomStatus(roomId: number, status: Room["status"]): Promise<void> {
+    await db.query('UPDATE rooms SET status = $1 WHERE id = $2', [status, roomId]);
   }
 
-  static deleteRoom(roomId: number): void {
-    const stmt = db.prepare("DELETE FROM rooms WHERE id = ?");
-    stmt.run(roomId);
+  static async deleteRoom(roomId: number): Promise<void> {
+    await db.query('DELETE FROM rooms WHERE id = $1', [roomId]);
   }
 
-  static addMember(roomId: number, userId: number): RoomMember {
-    const stmt = db.prepare(`
-      INSERT INTO room_members (room_id, user_id)
-      VALUES (?, ?)
-    `);
-
-    const result = stmt.run(roomId, userId);
+  static async addMember(roomId: number, userId: number): Promise<RoomMember> {
+    const result = await db.query(
+      `INSERT INTO room_members (room_id, user_id)
+       VALUES ($1, $2)
+       RETURNING *`,
+      [roomId, userId]
+    );
     
-    const getMember = db.prepare("SELECT * FROM room_members WHERE id = ?");
-    const member = getMember.get(result.lastInsertRowid) as RoomMember;
-    
-    // Convert is_ready from integer to boolean
-    member.is_ready = Boolean(member.is_ready);
-    
-    return member;
+    return result.rows[0] as RoomMember;
   }
 
-  static removeMember(roomId: number, userId: number): void {
-    const stmt = db.prepare(`
-      DELETE FROM room_members
-      WHERE room_id = ? AND user_id = ?
-    `);
-    stmt.run(roomId, userId);
+  static async removeMember(roomId: number, userId: number): Promise<void> {
+    await db.query(
+      `DELETE FROM room_members
+       WHERE room_id = $1 AND user_id = $2`,
+      [roomId, userId]
+    );
   }
 
-  static assignPlayerOrders(roomId: number): void {
-    const members = db.prepare(`
-      SELECT id FROM room_members WHERE room_id = ? ORDER BY joined_at
-    `).all(roomId) as { id: number }[];
+  static async assignPlayerOrders(roomId: number): Promise<void> {
+    const result = await db.query(
+      `SELECT id FROM room_members WHERE room_id = $1 ORDER BY joined_at`,
+      [roomId]
+    );
 
-    const stmt = db.prepare(`
-      UPDATE room_members SET player_order = ? WHERE id = ?
-    `);
+    const members = result.rows as { id: number }[];
 
-    members.forEach((member, index) => {
-      stmt.run(index, member.id);
-    });
+    for (let i = 0; i < members.length; i++) {
+      await db.query(
+        `UPDATE room_members SET player_order = $1 WHERE id = $2`,
+        [i, members[i].id]
+      );
+    }
   }
 
-  static getRoomMembers(roomId: number): RoomMember[] {
-    const stmt = db.prepare("SELECT * FROM room_members WHERE room_id = ?");
-    const members = stmt.all(roomId) as RoomMember[];
-    
-    // Convert is_ready from integer to boolean
-    members.forEach(member => {
-      member.is_ready = Boolean(member.is_ready);
-    });
-    
-    return members;
+  static async getRoomMembers(roomId: number): Promise<RoomMember[]> {
+    const result = await db.query(
+      'SELECT * FROM room_members WHERE room_id = $1',
+      [roomId]
+    );
+    return result.rows as RoomMember[];
   }
 
-  static isRoomFull(roomId: number): boolean {
-    const room = this.getRoomById(roomId);
+  static async isRoomFull(roomId: number): Promise<boolean> {
+    const room = await this.getRoomById(roomId);
     if (!room) return true;
 
-    const members = this.getRoomMembers(roomId);
+    const members = await this.getRoomMembers(roomId);
     return members.length >= room.max_players;
   }
 }

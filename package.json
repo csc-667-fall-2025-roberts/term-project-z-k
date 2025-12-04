@@ -8,28 +8,28 @@
     "start": "node dist/backend/server.js",
     "test": "ts-node src/backend/test/test-all.ts",
     "test:watch": "nodemon --exec ts-node src/backend/test/test-all.ts",
-    "migrate:up": "ts-node src/backend/db/migrate.ts up",
-    "migrate:down": "ts-node src/backend/db/migrate.ts down",
-    "migrate:status": "ts-node src/backend/db/migrate-status.ts",
-    "db:reset": "npm run db:clear && npm run migrate:up",
-    "db:setup": "node setup-migrations.js",
+    "test:migrate": "ts-node src/backend/test/test-migrations.ts",
+    "dev": "ts-node server.ts",
+    "db:init": "ts-node src/backend/db/database.ts",
     "db:populate": "ts-node src/backend/db/populate-db.ts",
-    "db:clear": "node -e \"const fs = require('fs'); if (fs.existsSync('crazy_eights.db')) fs.unlinkSync('crazy_eights.db'); console.log('Database cleared');\"",
-    "db:fresh": "npm run db:clear && npm run migrate:up && npm run db:populate",
-    "test:migrations": "ts-node src/backend/test/test-migrations.ts"
+    "db:status": "ts-node src/backend/db/migrate-status.ts",
+    "migrate:up": "ts-node src/backend/db/migrate.ts up",
+    "migrate:down": "ts-node src/backend/db/migrate.ts down"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@types/pg": "^8.15.6",
     "bcrypt": "^6.0.0",
-    "better-sqlite3": "^12.5.0",
+    "dotenv": "^17.2.3",
     "ejs": "^3.1.10",
     "express": "^5.1.0",
     "express-session": "^1.18.2",
     "http-errors": "^2.0.0",
-    "morgan": "^1.10.1"
+    "morgan": "^1.10.1",
+    "pg": "^8.16.3"
   },
   "devDependencies": {
     "@types/bcrypt": "^6.0.0",
@@ -37,14 +37,14 @@
     "@types/express": "^5.0.3",
     "@types/express-session": "^1.18.2",
     "@types/morgan": "^1.9.10",
-    "@types/node": "^24.6.0",
+    "@types/node": "^24.10.1",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.3",
     "nodemon": "^3.1.10",
     "prettier": "^3.6.2",
     "prettier-plugin-ejs": "^1.0.3",
     "ts-node": "^10.9.2",
-    "typescript": "^5.9.2"
+    "typescript": "^5.9.3"
   },
   "lint-staged": {
     "**/*": "prettier --plugin=prettier-plugin-ejs --write --ignore-unknown"

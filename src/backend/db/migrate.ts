@@ -1,28 +1,27 @@
-//vibe coded using chat gpt and deepseek
+import { Pool } from 'pg';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
-import Database from "better-sqlite3";
-import * as path from "path";
-import * as fs from "fs";
+dotenv.config();
 
-const DB_PATH = path.join(__dirname, "../../../", "crazy_eights.db");
-const MIGRATIONS_DIR = path.join(__dirname, "migrations");
+const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
 // Create migrations table if it doesn't exist
-function createMigrationsTable(db: Database.Database) {
-  db.exec(`
+async function createMigrationsTable(pool: Pool) {
+  await pool.query(`
     CREATE TABLE IF NOT EXISTS migrations (
-      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      id SERIAL PRIMARY KEY,
       name TEXT UNIQUE NOT NULL,
-      executed_at DATETIME DEFAULT CURRENT_TIMESTAMP
+      executed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     )
   `);
 }
 
 // Get all executed migrations
-function getExecutedMigrations(db: Database.Database): string[] {
-  const stmt = db.prepare("SELECT name FROM migrations ORDER BY executed_at");
-  const rows = stmt.all() as { name: string }[];
-  return rows.map(row => row.name);
+async function getExecutedMigrations(pool: Pool): Promise<string[]> {
+  const result = await pool.query('SELECT name FROM migrations ORDER BY executed_at');
+  return result.rows.map((row: any) => row.name);
 }
 
 // Get all migration files
@@ -39,39 +38,54 @@ function getMigrationFiles(): string[] {
 }
 
 // Execute a migration
-function executeMigration(db: Database.Database, migrationFile: string, direction: 'up' | 'down') {
+async function executeMigration(pool: Pool, migrationFile: string, direction: 'up' | 'down') {
   const migrationPath = path.join(MIGRATIONS_DIR, migrationFile);
   const sql = fs.readFileSync(migrationPath, 'utf-8');
   
-  // Split SQL by statements
-  const statements = sql.split(';').filter(stmt => stmt.trim());
+  const client = await pool.connect();
   
-  db.transaction(() => {
+  try {
+    await client.query('BEGIN');
+    
+    // Split SQL by statements (PostgreSQL can handle multiple statements)
+    const statements = sql.split(';').filter(stmt => stmt.trim());
+    
     for (const statement of statements) {
       if (statement.trim()) {
-        db.exec(statement);
+        await client.query(statement);
       }
     }
     
     if (direction === 'up') {
-      const stmt = db.prepare("INSERT INTO migrations (name) VALUES (?)");
-      stmt.run(migrationFile);
+      await client.query('INSERT INTO migrations (name) VALUES ($1)', [migrationFile]);
       console.log(`✓ Applied migration: ${migrationFile}`);
     } else {
-      const stmt = db.prepare("DELETE FROM migrations WHERE name = ?");
-      stmt.run(migrationFile);
+      await client.query('DELETE FROM migrations WHERE name = $1', [migrationFile]);
       console.log(`✓ Reverted migration: ${migrationFile}`);
     }
-  })();
+    
+    await client.query('COMMIT');
+  } catch (error) {
+    await client.query('ROLLBACK');
+    throw error;
+  } finally {
+    client.release();
+  }
 }
 
 // Run migrations
-function runMigrations(direction: 'up' | 'down') {
-  const db = new Database(DB_PATH);
+async function runMigrations(direction: 'up' | 'down') {
+  const pool = new Pool({
+    user: process.env.DB_USER || 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    database: process.env.DB_NAME || 'crazy_eights',
+    password: process.env.DB_PASSWORD || 'postgres',
+    port: parseInt(process.env.DB_PORT || '5432'),
+  });
   
   try {
-    createMigrationsTable(db);
-    const executedMigrations = getExecutedMigrations(db);
+    await createMigrationsTable(pool);
+    const executedMigrations = await getExecutedMigrations(pool);
     const migrationFiles = getMigrationFiles();
     
     if (direction === 'up') {
@@ -79,19 +93,19 @@ function runMigrations(direction: 'up' | 'down') {
       const pendingMigrations = migrationFiles.filter(file => !executedMigrations.includes(file));
       
       if (pendingMigrations.length === 0) {
-        console.log("No pending migrations.");
+        console.log('No pending migrations.');
         return;
       }
       
       console.log(`Applying ${pendingMigrations.length} migration(s):`);
       for (const migrationFile of pendingMigrations) {
-        executeMigration(db, migrationFile, 'up');
+        await executeMigration(pool, migrationFile, 'up');
       }
       
     } else {
       // Revert the last migration
       if (executedMigrations.length === 0) {
-        console.log("No migrations to revert.");
+        console.log('No migrations to revert.');
         return;
       }
       
@@ -100,17 +114,17 @@ function runMigrations(direction: 'up' | 'down') {
       
       if (migrationFile) {
         console.log(`Reverting migration: ${lastMigration}`);
-        executeMigration(db, migrationFile, 'down');
+        await executeMigration(pool, migrationFile, 'down');
       } else {
         console.log(`Warning: Migration file ${lastMigration} not found`);
       }
     }
     
   } catch (error) {
-    console.error("Migration failed:", error);
+    console.error('Migration failed:', error);
     process.exit(1);
   } finally {
-    db.close();
+    await pool.end();
   }
 }
 
@@ -118,7 +132,7 @@ function runMigrations(direction: 'up' | 'down') {
 const direction = process.argv[2] as 'up' | 'down';
 
 if (direction !== 'up' && direction !== 'down') {
-  console.log("Usage: ts-node migrate.ts [up|down]");
+  console.log('Usage: ts-node migrate.ts [up|down]');
   process.exit(1);
 }
 

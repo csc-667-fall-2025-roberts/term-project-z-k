@@ -1,32 +1,39 @@
-//vibe coded using chat gpt and deepseek
+import { Pool } from 'pg';
+import * as path from 'path';
+import * as fs from 'fs';
+import * as dotenv from 'dotenv';
 
-import Database from "better-sqlite3";
-import * as path from "path";
-import * as fs from "fs";
+dotenv.config();
 
-const DB_PATH = path.join(__dirname, "../../../", "crazy_eights.db");
-const MIGRATIONS_DIR = path.join(__dirname, "migrations");
+const MIGRATIONS_DIR = path.join(__dirname, 'migrations');
 
-function showMigrationStatus() {
-  const db = new Database(DB_PATH);
+async function showMigrationStatus() {
+  const pool = new Pool({
+    user: process.env.DB_USER || 'postgres',
+    host: process.env.DB_HOST || 'localhost',
+    database: process.env.DB_NAME || 'crazy_eights',
+    password: process.env.DB_PASSWORD || 'postgres',
+    port: parseInt(process.env.DB_PORT || '5432'),
+  });
   
   try {
     // Check if migrations table exists
-    const migrationsTableExists = db.prepare(`
-      SELECT name FROM sqlite_master WHERE type='table' AND name='migrations'
-    `).get();
+    const tableCheck = await pool.query(`
+      SELECT EXISTS (
+        SELECT FROM information_schema.tables 
+        WHERE table_name = 'migrations'
+      )
+    `);
 
-    if (!migrationsTableExists) {
-      console.log("❌ Migrations table does not exist - database not initialized");
-      console.log("   Run: npm run migrate:up");
+    if (!tableCheck.rows[0].exists) {
+      console.log('❌ Migrations table does not exist - database not initialized');
+      console.log('   Run: npm run migrate:up');
       return;
     }
 
     // Get executed migrations
-    const executedMigrations = db.prepare("SELECT name FROM migrations ORDER BY executed_at")
-      .all() as { name: string }[];
-    
-    const executedNames = executedMigrations.map(m => m.name);
+    const executedResult = await pool.query('SELECT name FROM migrations ORDER BY executed_at');
+    const executedNames = executedResult.rows.map((row: any) => row.name);
     
     // Get all migration files
     const migrationFiles = fs.existsSync(MIGRATIONS_DIR) 
@@ -35,17 +42,17 @@ function showMigrationStatus() {
           .sort()
       : [];
 
-    console.log("📊 Migration Status:");
-    console.log("===================");
+    console.log('📊 Migration Status:');
+    console.log('===================');
     
     if (migrationFiles.length === 0) {
-      console.log("No migration files found");
+      console.log('No migration files found');
       return;
     }
 
     migrationFiles.forEach(file => {
       const isApplied = executedNames.includes(file);
-      const status = isApplied ? "✅ Applied" : "❌ Pending";
+      const status = isApplied ? '✅ Applied' : '❌ Pending';
       console.log(`${status} - ${file}`);
     });
 
@@ -57,9 +64,9 @@ function showMigrationStatus() {
     }
 
   } catch (error) {
-    console.error("Error checking migration status:", error);
+    console.error('Error checking migration status:', error);
   } finally {
-    db.close();
+    await pool.end();
   }
 }
 

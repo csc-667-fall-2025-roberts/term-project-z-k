@@ -25,13 +25,16 @@ export class GameService {
     return shuffled;
   }
 
-  static createGame(roomId: number, playerIds: number[]): Game {
-    // Wrap entire game creation in a transaction
-    const createGameTransaction = db.transaction(() => {
+  static async createGame(roomId: number, playerIds: number[]): Promise<Game> {
+    const client = await db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
       let deck = this.createDeck();
       
       // Validate we have enough cards
-      const totalCardsNeeded = 5 * playerIds.length + 1; // 5 per player + 1 for top card
+      const totalCardsNeeded = 5 * playerIds.length + 1;
       if (deck.length < totalCardsNeeded) {
         throw new Error(`Not enough cards in deck. Need ${totalCardsNeeded}, have ${deck.length}`);
       }
@@ -63,232 +66,222 @@ export class GameService {
       } while (topCard.rank === "8");
 
       // Create the game record
-      const stmt = db.prepare(`
-        INSERT INTO games (room_id, current_player_id, direction, top_card, active_suit, deck, status)
-        VALUES (?, ?, ?, ?, ?, ?, 'active')
-      `);
-
-      const result = stmt.run(
-        roomId,
-        playerIds[0],
-        "clockwise",
-        JSON.stringify(topCard),
-        topCard.suit,
-        JSON.stringify(deck)
+      const gameResult = await client.query(
+        `INSERT INTO games (room_id, current_player_id, direction, top_card, active_suit, deck, status)
+         VALUES ($1, $2, $3, $4, $5, $6, 'active')
+         RETURNING *`,
+        [roomId, playerIds[0], "clockwise", JSON.stringify(topCard), topCard.suit, JSON.stringify(deck)]
       );
 
-      const gameId = result.lastInsertRowid as number;
+      const game = gameResult.rows[0] as Game;
 
       // Create hands for each player
       for (const [playerId, cards] of hands.entries()) {
-        this.createHandInternal(gameId, playerId, cards);
+        await client.query(
+          `INSERT INTO hands (game_id, user_id, cards, card_count)
+           VALUES ($1, $2, $3, $4)`,
+          [game.id, playerId, JSON.stringify(cards), cards.length]
+        );
       }
 
       // Log game start
-      this.logTurn(gameId, playerIds[0], "play_card", topCard);
+      await client.query(
+        `INSERT INTO turn_log (game_id, user_id, action, card_played)
+         VALUES ($1, $2, $3, $4)`,
+        [game.id, playerIds[0], "play_card", JSON.stringify(topCard)]
+      );
 
-      return gameId;
-    });
-
-    // Execute the transaction
-    const gameId = createGameTransaction();
-    
-    // Fetch and return the complete game
-    const game = this.getGameById(gameId);
-    if (!game) {
-      throw new Error("Failed to retrieve created game");
+      await client.query('COMMIT');
+      return game;
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
     }
+  }
+
+  static async getGameById(id: number): Promise<Game | undefined> {
+    const result = await db.query('SELECT * FROM games WHERE id = $1', [id]);
+    return result.rows[0] as Game | undefined;
+  }
+
+  static async getActiveGameByRoom(roomId: number): Promise<Game | undefined> {
+    const result = await db.query(
+      `SELECT * FROM games WHERE room_id = $1 AND status = 'active'`,
+      [roomId]
+    );
+    return result.rows[0] as Game | undefined;
+  }
+
+  static async getHand(gameId: number, userId: number): Promise<Hand | undefined> {
+    const result = await db.query(
+      `SELECT * FROM hands WHERE game_id = $1 AND user_id = $2`,
+      [gameId, userId]
+    );
+    return result.rows[0] as Hand | undefined;
+  }
+
+  static async updateHand(gameId: number, userId: number, cards: Card[]): Promise<void> {
+    await db.query(
+      `UPDATE hands
+       SET cards = $1, card_count = $2
+       WHERE game_id = $3 AND user_id = $4`,
+      [JSON.stringify(cards), cards.length, gameId, userId]
+    );
+  }
+
+  static async playCard(gameId: number, userId: number, card: Card, declaredSuit?: string): Promise<void> {
+    const client = await db.connect();
     
-    return game;
-  }
-
-  // Internal method for use within transactions (doesn't fetch the created hand)
-  private static createHandInternal(gameId: number, userId: number, cards: Card[]): number {
-    const stmt = db.prepare(`
-      INSERT INTO hands (game_id, user_id, cards, card_count)
-      VALUES (?, ?, ?, ?)
-    `);
-
-    const result = stmt.run(gameId, userId, JSON.stringify(cards), cards.length);
-    return result.lastInsertRowid as number;
-  }
-
-  // Public method that also fetches the created hand
-  static createHand(gameId: number, userId: number, cards: Card[]): Hand {
-    const id = this.createHandInternal(gameId, userId, cards);
-    const getHand = db.prepare("SELECT * FROM hands WHERE id = ?");
-    return getHand.get(id) as Hand;
-  }
-
-  static getGameById(id: number): Game | undefined {
-    const stmt = db.prepare("SELECT * FROM games WHERE id = ?");
-    return stmt.get(id) as Game | undefined;
-  }
-
-  static getActiveGameByRoom(roomId: number): Game | undefined {
-    const stmt = db.prepare(`
-      SELECT * FROM games WHERE room_id = ? AND status = 'active'
-    `);
-    return stmt.get(roomId) as Game | undefined;
-  }
-
-  static getHand(gameId: number, userId: number): Hand | undefined {
-    const stmt = db.prepare(`
-      SELECT * FROM hands WHERE game_id = ? AND user_id = ?
-    `);
-    return stmt.get(gameId, userId) as Hand | undefined;
-  }
-
-  static updateHand(gameId: number, userId: number, cards: Card[]): void {
-    const stmt = db.prepare(`
-      UPDATE hands
-      SET cards = ?, card_count = ?
-      WHERE game_id = ? AND user_id = ?
-    `);
-    stmt.run(JSON.stringify(cards), cards.length, gameId, userId);
-  }
-
-  static playCard(gameId: number, userId: number, card: Card, declaredSuit?: string): void {
-    // Wrap in transaction to ensure all updates happen together
-    const playCardTransaction = db.transaction(() => {
-      const game = this.getGameById(gameId);
-      if (!game) throw new Error("Game not found");
+    try {
+      await client.query('BEGIN');
 
       // Update top card and active suit
-      const updateGame = db.prepare(`
-        UPDATE games
-        SET top_card = ?, active_suit = ?
-        WHERE id = ?
-      `);
-      updateGame.run(
-        JSON.stringify(card),
-        declaredSuit || card.suit,
-        gameId
+      await client.query(
+        `UPDATE games
+         SET top_card = $1, active_suit = $2
+         WHERE id = $3`,
+        [JSON.stringify(card), declaredSuit || card.suit, gameId]
       );
 
       // Log the turn
-      this.logTurn(gameId, userId, "play_card", card, declaredSuit);
+      await client.query(
+        `INSERT INTO turn_log (game_id, user_id, action, card_played, suit_declared)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [gameId, userId, "play_card", JSON.stringify(card), declaredSuit || null]
+      );
 
       // Add to discard pile
-      const addDiscard = db.prepare(`
-        INSERT INTO discard_pile (game_id, card, played_by)
-        VALUES (?, ?, ?)
-      `);
-      addDiscard.run(gameId, JSON.stringify(card), userId);
-    });
+      await client.query(
+        `INSERT INTO discard_pile (game_id, card, played_by)
+         VALUES ($1, $2, $3)`,
+        [gameId, JSON.stringify(card), userId]
+      );
 
-    playCardTransaction();
+      await client.query('COMMIT');
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  static drawCard(gameId: number, userId: number): Card | null {
-    // Wrap in transaction to ensure deck update and hand update happen together
-    const drawCardTransaction = db.transaction(() => {
-      const game = this.getGameById(gameId);
+  static async drawCard(gameId: number, userId: number): Promise<Card | null> {
+    const client = await db.connect();
+    
+    try {
+      await client.query('BEGIN');
+      
+      const gameResult = await client.query('SELECT * FROM games WHERE id = $1', [gameId]);
+      const game = gameResult.rows[0] as Game;
+      
       if (!game) throw new Error("Game not found");
 
       const deck: Card[] = JSON.parse(game.deck);
-      if (deck.length === 0) return null;
+      if (deck.length === 0) {
+        await client.query('ROLLBACK');
+        return null;
+      }
 
       const card = deck.pop()!;
 
       // Update deck
-      const updateDeck = db.prepare("UPDATE games SET deck = ? WHERE id = ?");
-      updateDeck.run(JSON.stringify(deck), gameId);
+      await client.query('UPDATE games SET deck = $1 WHERE id = $2', [JSON.stringify(deck), gameId]);
 
       // Update hand
-      const hand = this.getHand(gameId, userId);
+      const handResult = await client.query(
+        'SELECT * FROM hands WHERE game_id = $1 AND user_id = $2',
+        [gameId, userId]
+      );
+      
+      const hand = handResult.rows[0] as Hand;
+      
       if (hand) {
         const cards: Card[] = JSON.parse(hand.cards);
         cards.push(card);
-        this.updateHand(gameId, userId, cards);
+        await client.query(
+          'UPDATE hands SET cards = $1, card_count = $2 WHERE game_id = $3 AND user_id = $4',
+          [JSON.stringify(cards), cards.length, gameId, userId]
+        );
       } else {
         throw new Error("Hand not found for user");
       }
 
       // Log the turn
-      this.logTurn(gameId, userId, "draw_card", null, null, 1);
+      await client.query(
+        `INSERT INTO turn_log (game_id, user_id, action, cards_drawn)
+         VALUES ($1, $2, $3, $4)`,
+        [gameId, userId, "draw_card", 1]
+      );
 
+      await client.query('COMMIT');
       return card;
-    });
-
-    return drawCardTransaction();
+      
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
   }
 
-  static logTurn(
-    gameId: number,
-    userId: number,
-    action: TurnLog["action"],
-    cardPlayed: Card | null = null,
-    suitDeclared: string | null = null,
-    cardsDrawn = 0
-  ): void {
-    const stmt = db.prepare(`
-      INSERT INTO turn_log (game_id, user_id, action, card_played, suit_declared, cards_drawn)
-      VALUES (?, ?, ?, ?, ?, ?)
-    `);
-
-    stmt.run(
-      gameId,
-      userId,
-      action,
-      cardPlayed ? JSON.stringify(cardPlayed) : null,
-      suitDeclared,
-      cardsDrawn
+  static async setNextPlayer(gameId: number, nextPlayerId: number): Promise<void> {
+    await db.query(
+      `UPDATE games SET current_player_id = $1 WHERE id = $2`,
+      [nextPlayerId, gameId]
     );
   }
 
-  static setNextPlayer(gameId: number, nextPlayerId: number): void {
-    const stmt = db.prepare(`
-      UPDATE games SET current_player_id = ? WHERE id = ?
-    `);
-    stmt.run(nextPlayerId, gameId);
-  }
-
-  static reverseDirection(gameId: number): void {
-    const game = this.getGameById(gameId);
+  static async reverseDirection(gameId: number): Promise<void> {
+    const game = await this.getGameById(gameId);
     if (!game) return;
 
     const newDirection = game.direction === "clockwise" ? "counterclockwise" : "clockwise";
-    const stmt = db.prepare(`
-      UPDATE games SET direction = ? WHERE id = ?
-    `);
-    stmt.run(newDirection, gameId);
+    await db.query(
+      `UPDATE games SET direction = $1 WHERE id = $2`,
+      [newDirection, gameId]
+    );
   }
 
-  static finishGame(gameId: number, winnerId: number): void {
-    const stmt = db.prepare(`
-      UPDATE games
-      SET status = 'finished', winner_id = ?, finished_at = CURRENT_TIMESTAMP
-      WHERE id = ?
-    `);
-    stmt.run(winnerId, gameId);
+  static async finishGame(gameId: number, winnerId: number): Promise<void> {
+    await db.query(
+      `UPDATE games
+       SET status = 'finished', winner_id = $1, finished_at = CURRENT_TIMESTAMP
+       WHERE id = $2`,
+      [winnerId, gameId]
+    );
   }
 
-  static getGameState(gameId: number): GameState | undefined {
-    const game = this.getGameById(gameId);
+  static async getGameState(gameId: number): Promise<GameState | undefined> {
+    const game = await this.getGameById(gameId);
     if (!game) return undefined;
 
-    const stmt = db.prepare(`
-      SELECT 
-        h.user_id,
-        u.username,
-        h.card_count,
-        CASE WHEN g.current_player_id = h.user_id THEN 1 ELSE 0 END as is_current
-      FROM hands h
-      JOIN users u ON h.user_id = u.id
-      JOIN games g ON h.game_id = g.id
-      WHERE h.game_id = ?
-      ORDER BY h.user_id
-    `);
+    const result = await db.query(
+      `SELECT 
+         h.user_id,
+         u.username,
+         h.card_count,
+         CASE WHEN g.current_player_id = h.user_id THEN true ELSE false END as is_current
+       FROM hands h
+       JOIN users u ON h.user_id = u.id
+       JOIN games g ON h.game_id = g.id
+       WHERE h.game_id = $1
+       ORDER BY h.user_id`,
+      [gameId]
+    );
 
-    const players = stmt.all(gameId) as GameState["players"];
+    const players = result.rows as GameState["players"];
     return { ...game, players };
   }
 
-  static getTurnHistory(gameId: number): TurnLog[] {
-    const stmt = db.prepare(`
-      SELECT * FROM turn_log WHERE game_id = ? ORDER BY timestamp ASC
-    `);
-    return stmt.all(gameId) as TurnLog[];
+  static async getTurnHistory(gameId: number): Promise<TurnLog[]> {
+    const result = await db.query(
+      `SELECT * FROM turn_log WHERE game_id = $1 ORDER BY timestamp ASC`,
+      [gameId]
+    );
+    return result.rows as TurnLog[];
   }
 }
