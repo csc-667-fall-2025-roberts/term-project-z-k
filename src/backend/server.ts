@@ -8,6 +8,9 @@ import rootRoutes from "./routes/root";
 import { testRouter } from "./routes/test";
 import gameRoutes from "./routes/game";
 import userRoutes from "./routes/user";
+import chatRoutes from "./routes/chat";
+import { createServer } from 'http';
+import { Server as IOServer } from 'socket.io';
 
 import session from "express-session";
 import connectPgSimple from 'connect-pg-simple';
@@ -54,7 +57,52 @@ app.set("view engine", "ejs");
 app.use("/test", testRouter);
 app.use("/api/game", gameRoutes);
 app.use("/api/user", userRoutes);
+app.use("/api/chat", chatRoutes);
 app.use("/", rootRoutes);
+
+// Create HTTP server and attach socket.io for real-time events
+const httpServer = createServer(app);
+const io = new IOServer(httpServer, {
+  cors: {
+    origin: true,
+    methods: ["GET", "POST"]
+  }
+});
+
+// Expose io via app.locals for routes to emit events
+app.locals.io = io;
+
+io.on('connection', (socket) => {
+  console.log('socket connected:', socket.id);
+
+  socket.on('joinGame', ({ gameId }) => {
+    const room = `game:${gameId}`;
+    socket.join(room);
+    console.log(`socket ${socket.id} joined ${room}`);
+  });
+
+  socket.on('leaveGame', ({ gameId }) => {
+    const room = `game:${gameId}`;
+    socket.leave(room);
+    console.log(`socket ${socket.id} left ${room}`);
+  });
+
+  socket.on('joinChat', ({ roomId }) => {
+    const room = `chat:room:${roomId}`;
+    socket.join(room);
+    console.log(`socket ${socket.id} joined chat ${room}`);
+  });
+
+  socket.on('leaveChat', ({ roomId }) => {
+    const room = `chat:room:${roomId}`;
+    socket.leave(room);
+    console.log(`socket ${socket.id} left chat ${room}`);
+  });
+
+  socket.on('disconnect', () => {
+    console.log('socket disconnected:', socket.id);
+  });
+});
 
 
 
@@ -69,6 +117,6 @@ app.use((error: any, _request: express.Request, response: express.Response, _nex
   });
 });
 
-app.listen(PORT, () => {
+httpServer.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });

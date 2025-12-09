@@ -6,6 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Crazy Eights</title>
     <link rel="stylesheet" href="css/signup.css">
+    <link rel="stylesheet" href="/css/chat.css">
 </head>
 
 <body>
@@ -26,10 +27,16 @@
             <input id="email" type="text">
 
             <p>Password</p>
-            <input id="password" type="text">
+            <div class="password-field">
+                <input id="password" type="password">
+                <button type="button" class="show-password" aria-pressed="false" aria-label="Show password">Show</button>
+            </div>
 
             <p>Confirm Password</p>
-            <input id="confirm-password" type="text">
+            <div class="password-field">
+                <input id="confirm-password" type="password">
+                <button type="button" class="show-password" aria-pressed="false" aria-label="Show confirm password">Show</button>
+            </div>
 
             <p><input type="checkbox">Accept our <a href="">terms of service</a></p>
             <button id="signup-button" class="gradient-button">Sign Up</button>
@@ -46,6 +53,7 @@
         </div>
     </div>
 </body>
+<script src="/js/chat.js"></script>
 <script src="js/signup.js"></script>
 
 </html>

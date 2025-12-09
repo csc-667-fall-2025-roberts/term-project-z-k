@@ -75,3 +75,30 @@ document.querySelector('#signup-button').addEventListener('click', async (e) => 
 
     window.location.href = '/login';
 })
+
+// Show/hide password toggles for signup
+document.addEventListener('DOMContentLoaded', () => {
+    const pwInput = document.querySelector('#password');
+    const confirmInput = document.querySelector('#confirm-password');
+
+    const pwToggle = pwInput?.parentElement?.querySelector('.show-password');
+    const confirmToggle = confirmInput?.parentElement?.querySelector('.show-password');
+
+    if (pwToggle && pwInput) {
+        pwToggle.addEventListener('click', () => {
+            const isPassword = pwInput.type === 'password';
+            pwInput.type = isPassword ? 'text' : 'password';
+            pwToggle.textContent = isPassword ? 'Hide' : 'Show';
+            pwToggle.setAttribute('aria-pressed', String(isPassword));
+        });
+    }
+
+    if (confirmToggle && confirmInput) {
+        confirmToggle.addEventListener('click', () => {
+            const isPassword = confirmInput.type === 'password';
+            confirmInput.type = isPassword ? 'text' : 'password';
+            confirmToggle.textContent = isPassword ? 'Hide' : 'Show';
+            confirmToggle.setAttribute('aria-pressed', String(isPassword));
+        });
+    }
+});
