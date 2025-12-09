@@ -169,6 +169,92 @@ export class GameService {
     }
   }
 
+  /**
+   * Get ordered player id list for the game based on room member player_order
+   */
+  static async getPlayerOrderList(gameId: number): Promise<number[]> {
+    const game = await this.getGameById(gameId);
+    if (!game) throw new Error('Game not found');
+
+    const result = await db.query(
+      `SELECT rm.user_id FROM room_members rm
+       WHERE rm.room_id = $1
+       ORDER BY rm.player_order ASC NULLS LAST, rm.joined_at ASC`,
+      [game.room_id]
+    );
+
+    return result.rows.map((r: any) => r.user_id) as number[];
+  }
+
+  static async getNextPlayerId(gameId: number, steps = 1): Promise<number> {
+    const game = await this.getGameById(gameId);
+    if (!game) throw new Error('Game not found');
+
+    const order = await this.getPlayerOrderList(gameId);
+    if (order.length === 0) throw new Error('No players in game');
+
+    const currentIndex = order.findIndex(id => id === game.current_player_id);
+    if (currentIndex === -1) throw new Error('Current player not found in order');
+
+    const dir = game.direction === 'clockwise' ? 1 : -1;
+    const nextIndex = (currentIndex + dir * steps + order.length) % order.length;
+    return order[nextIndex];
+  }
+
+  static async advanceTurn(gameId: number, steps = 1): Promise<void> {
+    const nextId = await this.getNextPlayerId(gameId, steps);
+    await this.setNextPlayer(gameId, nextId);
+  }
+
+  /**
+   * Replenish the deck from the discard pile (keep top card as game's top card).
+   * Returns true if replenished, false otherwise.
+   */
+  static async replenishDeckFromDiscard(gameId: number): Promise<boolean> {
+    const client = await db.connect();
+    try {
+      await client.query('BEGIN');
+
+      const discardResult = await client.query(
+        `SELECT id, card FROM discard_pile WHERE game_id = $1 ORDER BY played_at ASC`,
+        [gameId]
+      );
+
+      const discards = discardResult.rows as { id: number; card: string }[];
+      if (discards.length <= 1) {
+        await client.query('ROLLBACK');
+        return false; // nothing to replenish from
+      }
+
+      // Keep the last played card as top card
+      const top = discards[discards.length - 1];
+      const shufflePool = discards.slice(0, -1).map(d => JSON.parse(d.card));
+
+      // Shuffle
+      for (let i = shufflePool.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [shufflePool[i], shufflePool[j]] = [shufflePool[j], shufflePool[i]];
+      }
+
+      // Update games.deck with new deck
+      await client.query('UPDATE games SET deck = $1 WHERE id = $2', [JSON.stringify(shufflePool), gameId]);
+
+      // Remove all those moved cards from discard_pile
+      const idsToRemove = discards.slice(0, -1).map(d => d.id);
+      if (idsToRemove.length > 0) {
+        await client.query(`DELETE FROM discard_pile WHERE id = ANY($1::int[])`, [idsToRemove]);
+      }
+
+      await client.query('COMMIT');
+      return true;
+    } catch (error) {
+      await client.query('ROLLBACK');
+      throw error;
+    } finally {
+      client.release();
+    }
+  }
+
   static async drawCard(gameId: number, userId: number): Promise<Card | null> {
     const client = await db.connect();
     

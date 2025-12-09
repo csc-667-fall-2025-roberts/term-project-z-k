@@ -57,3 +57,17 @@ document.querySelector('#login-button').addEventListener('click', async (e) => {
 
     window.location.href = '/lobby';
 })
+
+// Show/hide password toggle
+document.addEventListener('DOMContentLoaded', () => {
+    const toggle = document.querySelector('#password')?.parentElement?.querySelector('.show-password');
+    const input = document.querySelector('#password');
+    if (toggle && input) {
+        toggle.addEventListener('click', () => {
+            const isPassword = input.type === 'password';
+            input.type = isPassword ? 'text' : 'password';
+            toggle.textContent = isPassword ? 'Hide' : 'Show';
+            toggle.setAttribute('aria-pressed', String(isPassword));
+        });
+    }
+});

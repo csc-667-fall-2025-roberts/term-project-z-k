@@ -112,3 +112,21 @@ router.post("/login", async (req: Request, res: Response) => {
 
 
 export default router;
+
+// Logout route — destroy server session and clear cookie
+router.post('/logout', (req: express.Request, res: express.Response) => {
+  try {
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Session destroy error:', err);
+        return res.status(500).json({ error: 'Failed to logout' });
+      }
+      // Clear cookie (default name is connect.sid)
+      res.clearCookie('connect.sid');
+      return res.json({ message: 'Successfully logged out' });
+    });
+  } catch (err: any) {
+    console.error('Logout error:', err);
+    return res.status(500).json({ error: 'Failed to logout' });
+  }
+});

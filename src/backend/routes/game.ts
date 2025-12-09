@@ -160,6 +160,42 @@ router.post('/rooms/:roomId/leave', async (req, res) => {
   }
 });
 
+// Delete a room (host only)
+router.delete('/rooms/:roomId', async (req, res) => {
+  try {
+    const roomId = parseInt(req.params.roomId);
+    const userId = Number(req.session.userId);
+
+    if (isNaN(roomId)) {
+      return res.status(400).json({ error: 'Invalid room ID' });
+    }
+
+    const room = await RoomService.getRoomById(roomId);
+    if (!room) return res.status(404).json({ error: 'Room not found' });
+
+    // Only host can delete
+    if (Number(room.host_id) !== Number(userId)) {
+      return res.status(403).json({ error: 'Only the host may delete the room' });
+    }
+
+    await RoomService.deleteRoom(roomId);
+
+    // Notify via socket if available
+    try {
+      const io = (req.app.locals && req.app.locals.io) ? req.app.locals.io : null;
+      if (io) {
+        io.to(`room:${roomId}`).emit('room:deleted', { roomId });
+      }
+    } catch (e) {
+      console.warn('Failed to emit room:deleted', e);
+    }
+
+    res.json({ success: true });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start a game
 router.post('/rooms/:roomId/start', async (req, res) => {
   try {
@@ -188,6 +224,16 @@ router.post('/rooms/:roomId/start', async (req, res) => {
     const playerIds = members.map(m => m.user_id);
     const game = await GameService.createGame(roomId, playerIds);
     
+    // Emit game started to room
+    try {
+      const io = (req.app.locals && req.app.locals.io) ? req.app.locals.io : null;
+      if (io) {
+        io.to(`game:${game.id}`).emit('game:started', { gameId: game.id });
+      }
+    } catch (e) {
+      console.warn('Failed to emit game:started', e);
+    }
+
     res.json(game);
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -247,33 +293,93 @@ router.post('/games/:gameId/play', async (req, res) => {
       return res.status(400).json({ error: 'Invalid game ID' });
     }
     
+    const game = await GameService.getGameById(gameId);
+    if (!game) return res.status(404).json({ error: 'Game not found' });
+
+    // Only current player may play
+    if (Number(game.current_player_id) !== Number(userId)) {
+      return res.status(400).json({ error: 'Not your turn' });
+    }
+
     const hand = await GameService.getHand(gameId, userId);
     if (!hand) {
       return res.status(404).json({ error: 'Hand not found' });
     }
-    
+
     const cards = JSON.parse(hand.cards);
     const cardIndex = cards.findIndex(
       (c: any) => c.suit === card.suit && c.rank === card.rank
     );
-    
+
     if (cardIndex === -1) {
       return res.status(400).json({ error: 'Card not in hand' });
     }
-    
-    // Remove card from hand
+
+    // Validate legality of play
+    const gameTop = JSON.parse(game.top_card as any);
+    const activeSuit = game.active_suit;
+    const playable = (card.rank === '8') || (card.suit === activeSuit) || (card.rank === gameTop.rank);
+    if (!playable) {
+      return res.status(400).json({ error: 'Illegal play' });
+    }
+
+    // If playing an 8, require declaredSuit
+    if (card.rank === '8') {
+      const suits = ['hearts', 'diamonds', 'clubs', 'spades'];
+      if (!declaredSuit || !suits.includes(declaredSuit)) {
+        return res.status(400).json({ error: 'Must declare a valid suit when playing an 8' });
+      }
+    }
+
+    // Remove card from hand and update
     cards.splice(cardIndex, 1);
     await GameService.updateHand(gameId, userId, cards);
-    
-    // Play the card
+
+    // Play the card (persist top and discard)
     await GameService.playCard(gameId, userId, card, declaredSuit);
-    
-    // Check for winner
-    if (cards.length === 0) {
-      await GameService.finishGame(gameId, userId);
-      await UserService.updateStats(userId, true);
+
+    // Handle special card effects
+    // 2 -> next player draws 2 and is skipped
+    // J -> skip next player
+    // Q -> reverse direction
+    // 8 -> suit change (already handled)
+
+    try {
+      if (card.rank === '2') {
+        // victim draws 2
+        const victimId = await GameService.getNextPlayerId(gameId, 1);
+        await GameService.drawCard(gameId, victimId);
+        await GameService.drawCard(gameId, victimId);
+        // skip victim
+        await GameService.advanceTurn(gameId, 2);
+      } else if (card.rank === 'J') {
+        // skip next player
+        await GameService.advanceTurn(gameId, 2);
+      } else if (card.rank === 'Q') {
+        // reverse direction, then next player is the previous one
+        await GameService.reverseDirection(gameId);
+        await GameService.advanceTurn(gameId, 1);
+      } else {
+        // normal advance
+        await GameService.advanceTurn(gameId, 1);
+      }
+
+      // Check for winner
+      if (cards.length === 0) {
+        await GameService.finishGame(gameId, userId);
+        await UserService.updateStats(userId, true);
+      }
+
+      const io = (req.app.locals && req.app.locals.io) ? req.app.locals.io : null;
+      if (io) {
+        const state = await GameService.getGameState(gameId);
+        const hand = await GameService.getHand(gameId, userId);
+        io.to(`game:${gameId}`).emit('game:update', { gameId, state, userId, hand: hand ? JSON.parse(hand.cards) : [] });
+      }
+    } catch (e) {
+      console.warn('Failed to process special card effects or emit update', e);
     }
-    
+
     res.json({ success: true });
   } catch (error: any) {
     res.status(500).json({ error: error.message });
@@ -290,12 +396,45 @@ router.post('/games/:gameId/draw', async (req, res) => {
       return res.status(400).json({ error: 'Invalid game ID' });
     }
     
-    const card = await GameService.drawCard(gameId, userId);
-    
+    const game = await GameService.getGameById(gameId);
+    if (!game) return res.status(404).json({ error: 'Game not found' });
+
+    // Only current player may draw
+    if (Number(game.current_player_id) !== Number(userId)) {
+      return res.status(400).json({ error: 'Not your turn' });
+    }
+
+    // Attempt to draw; if deck empty try to replenish from discard
+    let card = await GameService.drawCard(gameId, userId);
+    if (!card) {
+      const replenished = await GameService.replenishDeckFromDiscard(gameId);
+      if (replenished) {
+        card = await GameService.drawCard(gameId, userId);
+      }
+    }
+
     if (!card) {
       return res.status(400).json({ error: 'Deck is empty' });
     }
-    
+
+    // After drawing, end turn
+    try {
+      await GameService.advanceTurn(gameId, 1);
+    } catch (e) {
+      console.warn('Failed to advance turn after draw', e);
+    }
+    // Emit update to room
+    try {
+      const io = (req.app.locals && req.app.locals.io) ? req.app.locals.io : null;
+      if (io) {
+        const state = await GameService.getGameState(gameId);
+        const hand = await GameService.getHand(gameId, userId);
+        io.to(`game:${gameId}`).emit('game:update', { gameId, state, userId, hand: hand ? JSON.parse(hand.cards) : [] });
+      }
+    } catch (e) {
+      console.warn('Failed to emit game:update', e);
+    }
+
     res.json(card);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

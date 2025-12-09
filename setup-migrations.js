@@ -156,7 +156,6 @@ console.log("  cp src/backend/db/migrations/001_initial_schema.sql src/backend/d
 console.log("  Then edit the new file with your schema changes");
 
 /*
-vibe coding to .js from .sh
 
 #!/bin/bash
 echo "Setting up migration system..."
