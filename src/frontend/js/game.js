@@ -486,23 +486,28 @@
     qs('#game-container').classList.remove('hidden');
     
     if (!gameId) gameId = roomId;
-    if (socket) socket.emit('joinGame', { gameId: roomId });
+    // Join the socket room for this specific game id if available (may be real game id or roomId fallback)
+    if (socket) socket.emit('joinGame', { gameId });
     await loadGameState();
   }
 
   async function loadGameState() {
     if (isLocalGame) return;
-    
+
     try {
-      let res = await fetch(`/api/game/games/${roomId}`);
+      // Ensure we request the actual gameId (fallback to roomId if not set)
+      if (!gameId) gameId = roomId;
+
+      if (!gameId) return;
+
+      let res = await fetch(`/api/game/games/${gameId}`);
       if (!res.ok) return;
-      
+
       const state = await res.json();
-      gameId = roomId;
 
       const handRes = await fetch(`/api/game/games/${gameId}/hand/${userId}`);
       const hand = handRes.ok ? await handRes.json() : [];
-      
+
       renderOnlineGameState(state, hand);
     } catch (e) {
       console.error('Failed to load game state:', e);

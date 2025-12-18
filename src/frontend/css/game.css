@@ -728,7 +728,7 @@ nav h1 {
 }
 #winner-modal button {
   background: var(--text-dark);
-  color: var(--text-primary);
+  color: white;
   border: none;
   padding: 15px 40px;
   font-size: 1rem;

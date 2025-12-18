@@ -19,11 +19,15 @@ export class RoomService {
       code = this.generateRoomCode();
     }
 
+    // Ensure maxPlayers is within allowed limits (2..4)
+    const cp = Number(maxPlayers) || 4;
+    const cappedMax = Math.min(4, Math.max(2, cp));
+
     const result = await db.query(
       `INSERT INTO rooms (name, code, host_id, max_players, is_private)
        VALUES ($1, $2, $3, $4, $5)
        RETURNING *`,
-      [name, code, hostId, maxPlayers, isPrivate]
+      [name, code, hostId, cappedMax, isPrivate]
     );
     
     return result.rows[0] as Room;
@@ -39,6 +43,43 @@ export class RoomService {
     
     if (result.rowCount === 0) {
       throw new Error(`User ${userId} is not a member of room ${roomId}`);
+    }
+    // After updating ready status, evaluate room status (waiting vs in_progress)
+    try {
+      await this.evaluateRoomStatus(roomId);
+    } catch (e) {
+      // swallow to avoid breaking flow; evaluation is best-effort
+      console.warn('Failed to evaluate room status after setPlayerReady', e);
+    }
+  }
+
+  // Evaluate and update a room's status based on member counts and ready flags.
+  // Rules:
+  // - If the room currently has status 'in_progress', leave it unchanged.
+  // - If members < max_players => 'waiting'
+  // - If members >= max_players and all players ready => 'in_progress'
+  // - Otherwise => 'waiting'
+  static async evaluateRoomStatus(roomId: number): Promise<void> {
+    const room = await this.getRoomById(roomId);
+    if (!room) return;
+
+    // If already in progress, do not change status here
+    if (room.status === 'in_progress') return;
+
+    const members = await this.getRoomMembers(roomId);
+    const memberCount = members.length;
+
+    if (memberCount < (room.max_players || 0)) {
+      await this.updateRoomStatus(roomId, 'waiting');
+      return;
+    }
+
+    // memberCount >= max_players
+    const allReady = await this.areAllPlayersReady(roomId);
+    if (allReady) {
+      await this.updateRoomStatus(roomId, 'in_progress');
+    } else {
+      await this.updateRoomStatus(roomId, 'waiting');
     }
   }
 
@@ -119,14 +160,42 @@ export class RoomService {
   }
 
   static async addMember(roomId: number, userId: number): Promise<RoomMember> {
+    // Ensure room exists
+    const room = await this.getRoomById(roomId);
+    if (!room) throw new Error('Room not found');
+
+    // Check if user is already a member
+    const existing = await db.query(
+      `SELECT * FROM room_members WHERE room_id = $1 AND user_id = $2`,
+      [roomId, userId]
+    );
+    if (existing.rows.length > 0) {
+      return existing.rows[0] as RoomMember;
+    }
+
+    // Check capacity
+    const members = await this.getRoomMembers(roomId);
+    if (members.length >= (room.max_players || 4)) {
+      throw new Error('Room is full');
+    }
+
     const result = await db.query(
       `INSERT INTO room_members (room_id, user_id)
        VALUES ($1, $2)
        RETURNING *`,
       [roomId, userId]
     );
-    
-    return result.rows[0] as RoomMember;
+
+    const inserted = result.rows[0] as RoomMember;
+
+    // After adding a member, re-evaluate room status (waiting vs in_progress)
+    try {
+      await this.evaluateRoomStatus(roomId);
+    } catch (e) {
+      console.warn('Failed to evaluate room status after addMember', e);
+    }
+
+    return inserted;
   }
 
   static async removeMember(roomId: number, userId: number): Promise<void> {
@@ -135,6 +204,12 @@ export class RoomService {
        WHERE room_id = $1 AND user_id = $2`,
       [roomId, userId]
     );
+    // After removing a member, re-evaluate room status (unless room deleted elsewhere)
+    try {
+      await this.evaluateRoomStatus(roomId);
+    } catch (e) {
+      console.warn('Failed to evaluate room status after removeMember', e);
+    }
   }
 
   static async assignPlayerOrders(roomId: number): Promise<void> {
