@@ -13,8 +13,19 @@ router.post('/rooms', async (req, res) => {
     const room = await RoomService.createRoom(name, hostId, maxPlayers, isPrivate);
     
     // Auto-join the host
+
     await RoomService.addMember(room.id, hostId);
     
+
+    try {
+      const io = (req.app.locals && req.app.locals.io) ? req.app.locals.io : null;
+      if (io) {
+        io.emit('room:created', { room });
+      }
+    } catch (e) {
+      console.warn('Failed to emit room:created', e);
+    }
+
     res.status(201).json(room);
   } catch (error: any) {
     res.status(500).json({ error: error.message });

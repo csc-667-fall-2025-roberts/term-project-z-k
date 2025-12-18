@@ -366,13 +366,24 @@
       const res = await fetch(`/api/game/rooms/${roomId}`);
       if (!res.ok) return;
       
+
       const room = await res.json();
       qs('#code-display').textContent = room.code;
       isHost = userId && Number(room.host_id) === Number(userId);
       
+
       if (userId) {
         const isMember = room.members?.some(m => Number(m.user_id) === Number(userId));
-        if (!isMember) {
+
+        if (socket) {
+          socket.emit('joinChat', { roomId });
+
+          if (!isMember) {
+            socket.emit('lobby:join', { roomId, userId });
+          } else {
+            socket.emit('lobby:joinRoom', { roomId });
+          }
+        } else if (!isMember) {
           await fetch(`/api/game/rooms/${room.code}/join`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -381,8 +392,10 @@
         }
       }
       
+
       renderMembers(room.members || []);
       
+
       if (room.status === 'in_progress') {
         await startOnlineGameUI();
       }
@@ -403,10 +416,32 @@
       </li>`;
     }).join('');
     
+
+    const myMember = members.find(m => Number(m.user_id) === Number(userId));
+    if (myMember) {
+      const btn = qs('#ready-btn');
+      btn.classList.toggle('not-ready', !myMember.is_ready);
+      btn.textContent = myMember.is_ready ? '✗ Cancel' : '✓ Ready';
+    }
+
     const allReady = members.length >= 2 && members.every(m => m.is_ready);
     const startBtn = qs('#start-btn');
-    startBtn.disabled = !isHost || !allReady;
-    startBtn.style.display = isHost ? 'inline-block' : 'none';
+
+    if (isHost) {
+      startBtn.style.display = 'inline-block';
+      startBtn.disabled = !allReady;
+      if (!allReady) {
+        startBtn.style.opacity = '0.5';
+        startBtn.style.cursor = 'not-allowed';
+        startBtn.title = 'All players must be ready to start';
+      } else {
+        startBtn.style.opacity = '1';
+        startBtn.style.cursor = 'pointer';
+        startBtn.title = 'Start the game';
+      }
+    } else {
+      startBtn.style.display = 'none';
+    }
   }
 
   // Ready button
@@ -416,24 +451,31 @@
       return;
     }
     
+
     const btn = qs('#ready-btn');
     const currentlyReady = btn.classList.contains('not-ready') ? false : true;
     const newReady = !currentlyReady;
-    
-    try {
-      const res = await fetch(`/api/game/rooms/${roomId}/ready`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, isReady: newReady })
-      });
-      
-      if (res.ok) {
-        btn.classList.toggle('not-ready', !newReady);
-        btn.textContent = newReady ? '✗ Cancel' : '✓ Ready';
-        loadRoom();
+
+    if (socket) {
+      socket.emit('lobby:ready', { roomId, userId, isReady: newReady });
+      btn.classList.toggle('not-ready', !newReady);
+      btn.textContent = newReady ? '✗ Cancel' : '✓ Ready';
+    } else {
+      try {
+        const res = await fetch(`/api/game/rooms/${roomId}/ready`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId, isReady: newReady })
+        });
+
+        if (res.ok) {
+          btn.classList.toggle('not-ready', !newReady);
+          btn.textContent = newReady ? '✗ Cancel' : '✓ Ready';
+          loadRoom();
+        }
+      } catch (e) {
+        console.error('Failed to set ready:', e);
       }
-    } catch (e) {
-      console.error('Failed to set ready:', e);
     }
   });
 
@@ -689,6 +731,34 @@
     socket.on('room:deleted', () => {
       showToast('Room was deleted');
       setTimeout(() => window.location.href = '/lobby', 1500);
+    });
+
+    socket.on('lobby:joined', (data) => {
+      if (data.room) {
+        renderMembers(data.room.members || []);
+        showToast('Joined lobby successfully');
+      }
+    });
+
+    socket.on('lobby:memberUpdate', (data) => {
+      if (data.room && data.room.id === roomId) {
+        renderMembers(data.room.members || []);
+      }
+    });
+
+    socket.on('lobby:readyUpdate', (data) => {
+      if (data.room && data.room.id === roomId) {
+        renderMembers(data.room.members || []);
+        const isMe = userId && Number(data.userId) === Number(userId);
+        if (!isMe) {
+          const username = data.room.members.find(m => Number(m.user_id) === Number(data.userId))?.username;
+          showToast(`${username} is ${data.isReady ? 'ready' : 'not ready'}`);
+        }
+      }
+    });
+
+    socket.on('lobby:error', (data) => {
+      showToast('Error: ' + data.message);
     });
   }
 

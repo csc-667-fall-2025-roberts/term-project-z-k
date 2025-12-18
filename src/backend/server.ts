@@ -15,6 +15,7 @@ import { Server as IOServer } from 'socket.io';
 import session from "express-session";
 import connectPgSimple from 'connect-pg-simple';
 import pg from 'pg';
+import { RoomService } from './services/roomService';
 
 const app = express();
 
@@ -97,6 +98,62 @@ io.on('connection', (socket) => {
     const room = `chat:room:${roomId}`;
     socket.leave(room);
     console.log(`socket ${socket.id} left chat ${room}`);
+  });
+
+  socket.on('lobby:join', async ({ roomId, userId }) => {
+    try {
+      const room = await RoomService.getRoomById(roomId);
+      if (!room) return socket.emit('lobby:error', { message: 'Room not found' });
+
+      if (await RoomService.isRoomFull(room.id)) {
+        return socket.emit('lobby:error', { message: 'Room is full' });
+      }
+
+      await RoomService.addMember(roomId, userId);
+      socket.join(`lobby:${roomId}`);
+
+      const roomWithMembers = await RoomService.getRoomWithMembers(roomId);
+      socket.emit('lobby:joined', { room: roomWithMembers });
+      io.to(`lobby:${roomId}`).emit('lobby:memberUpdate', { room: roomWithMembers });
+    } catch (error: any) {
+      socket.emit('lobby:error', { message: error.message });
+    }
+  });
+
+  socket.on('lobby:joinRoom', ({ roomId }) => {
+    socket.join(`lobby:${roomId}`);
+    console.log(`socket ${socket.id} joined lobby room ${roomId}`);
+  });
+
+  socket.on('lobby:ready', async ({ roomId, userId, isReady }) => {
+    try {
+      await RoomService.setPlayerReady(roomId, userId, isReady);
+      const roomWithMembers = await RoomService.getRoomWithMembers(roomId);
+
+      io.to(`lobby:${roomId}`).emit('lobby:readyUpdate', {
+        room: roomWithMembers,
+        userId,
+        isReady
+      });
+    } catch (error: any) {
+      socket.emit('lobby:error', { message: error.message });
+    }
+  });
+
+  socket.on('lobby:leave', async ({ roomId, userId }) => {
+    try {
+      socket.leave(`lobby:${roomId}`);
+      await RoomService.removeMember(roomId, userId);
+
+      // Check if room is empty
+      const members = await RoomService.getRoomMembers(roomId);
+      if (members.length === 0) {
+        await RoomService.deleteRoom(roomId);
+        io.emit('room:deleted', { roomId });
+      }
+    } catch (error) {
+      console.error('Error leaving lobby:', error);
+    }
   });
 
   socket.on('disconnect', () => {
