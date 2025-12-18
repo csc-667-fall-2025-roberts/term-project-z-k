@@ -4,8 +4,8 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crazy Eights</title>
-    <link rel="stylesheet" href="css/lobby.css">
+    <title>Crazy Eights - Lobby</title>
+    <link rel="stylesheet" href="/css/lobby.css">
     <link rel="stylesheet" href="/css/chat.css">
 </head>
 
@@ -19,13 +19,16 @@
             </div>
         </nav>
     </header>
+    
     <div id="main">
         <div id="create-room">
-            <h2>Create A Room</h2>
+            <h2>Create Room</h2>
+            
             <div class="form">
                 <span>Room Name</span>
-                <input id="room-name" type="text" placeholder="Room name">
+                <input id="room-name" type="text" placeholder="Enter room name">
             </div>
+            
             <div class="form">
                 <label>Max Players</label>
                 <select id="max-players">
@@ -34,27 +37,33 @@
                     <option value="4" selected>4 Players</option>
                 </select>
             </div>
+            
             <span>
-                <input id="private-room" type="checkbox" name="" id="">
+                <input id="private-room" type="checkbox">
                 <span>Private Room</span>
             </span>
+            
             <div>
                 <button id="create-room-button" class="gradient-button">Create Room</button>
             </div>
         </div>
+        
         <div id="rooms">
             <h2>Available Rooms</h2>
+            
             <div id="filter">
-                <button>All</button>
+                <button class="active">All</button>
                 <button>Waiting</button>
                 <button>In Progress</button>
             </div>
+            
             <div id="games"></div>
         </div>
     </div>
 </body>
 
+<script src="/js/theme.js"></script>
 <script src="/js/chat.js"></script>
-<script src="js/lobby.js"></script>
+<script src="/js/lobby.js"></script>
 
 </html>

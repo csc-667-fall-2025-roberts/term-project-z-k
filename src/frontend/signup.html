@@ -4,56 +4,61 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crazy Eights</title>
-    <link rel="stylesheet" href="css/signup.css">
+    <title>Crazy Eights - Sign Up</title>
+    <link rel="stylesheet" href="/css/signup.css">
     <link rel="stylesheet" href="/css/chat.css">
 </head>
 
 <body>
     <header>
-        <p id="title">Crazy Eights</p>
+        <p id="title">🃏 Crazy Eights</p>
         <p id="description">Play the classic card game online!</p>
     </header>
+    
     <div id="main">
         <div id="signup">
-            <p class="title">Sign Up</p>
+            <p class="title">Create Account</p>
 
             <div id="error-message" class="error-message hidden"></div>
             
             <p>Username</p>
-            <input id="username" type="text">
+            <input id="username" type="text" placeholder="Choose a username">
 
             <p>Email</p>
-            <input id="email" type="text">
+            <input id="email" type="email" placeholder="Enter your email">
 
             <p>Password</p>
             <div class="password-field">
-                <input id="password" type="password">
+                <input id="password" type="password" placeholder="Create a password (min 8 chars)">
                 <button type="button" class="show-password" aria-pressed="false" aria-label="Show password">Show</button>
             </div>
 
             <p>Confirm Password</p>
             <div class="password-field">
-                <input id="confirm-password" type="password">
+                <input id="confirm-password" type="password" placeholder="Confirm your password">
                 <button type="button" class="show-password" aria-pressed="false" aria-label="Show confirm password">Show</button>
             </div>
 
-            <p><input type="checkbox">Accept our <a href="">terms of service</a></p>
-            <button id="signup-button" class="gradient-button">Sign Up</button>
+            <p><input type="checkbox" id="terms-checkbox"> I accept the <a href="#">terms of service</a></p>
+            <button id="signup-button" class="gradient-button">Create Account</button>
             <p>Already have an account? <a href="/login">Login here</a></p>
         </div>
+        
         <div id="game-info">
-            <p>Game Info</p>
+            <p>How to Play</p>
             <ul>
                 <li>🎯 Match the top card by suit or rank</li>
-                <li>🎴 Eights are wild - change the suit!</li>
+                <li>🎴 Eights are wild - change the suit anytime!</li>
+                <li>📥 Can't play? Draw from the deck</li>
                 <li>🏆 First player to empty their hand wins</li>
-                <li>👥 Play with 2-4 players</li>
+                <li>👥 Play with 2-4 players online</li>
             </ul>
         </div>
     </div>
 </body>
+
+<script src="/js/theme.js"></script>
 <script src="/js/chat.js"></script>
-<script src="js/signup.js"></script>
+<script src="/js/signup.js"></script>
 
 </html>

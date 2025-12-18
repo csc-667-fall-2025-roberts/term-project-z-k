@@ -1,4 +1,3 @@
-//vibe coded using chat gpt and deepseek
 
 import Database from "better-sqlite3";
 import * as path from "path";
