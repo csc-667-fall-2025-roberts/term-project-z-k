@@ -4,38 +4,40 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Crazy Eights</title>
-    <link rel="stylesheet" href="css/login.css">
+    <title>Crazy Eights - Login</title>
+    <link rel="stylesheet" href="/css/login.css">
     <link rel="stylesheet" href="/css/chat.css">
 </head>
 
 <body>
     <header>
-        <p id="title">Crazy Eights</p>
+        <p id="title">🃏 Crazy Eights</p>
         <p id="description">Play the classic card game online!</p>
     </header>
+    
     <div id="main">
         <div id="login">
-            <p class="title">Login</p>
+            <p class="title">Welcome Back</p>
 
             <div id="error-message" class="error-message hidden"></div>
 
-            <p>Username/Email</p>
-            <input id="username-or-email" type="text">
+            <p>Username or Email</p>
+            <input id="username-or-email" type="text" placeholder="Enter your username or email">
 
             <p>Password</p>
             <div class="password-field">
-                <input id="password" type="password">
+                <input id="password" type="password" placeholder="Enter your password">
                 <button type="button" class="show-password" aria-pressed="false" aria-label="Show password">Show</button>
             </div>
 
             <button id="login-button" class="gradient-button">Login</button>
-            <p>Don't have an account yet? <a href="/signup">Signup here</a></p>
+            <p>Don't have an account? <a href="/signup">Sign up here</a></p>
         </div>
     </div>
 </body>
 
+<script src="/js/theme.js"></script>
 <script src="/js/chat.js"></script>
-<script src="js/login.js"></script>
+<script src="/js/login.js"></script>
 
 </html>

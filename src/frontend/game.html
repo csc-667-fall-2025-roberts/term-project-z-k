@@ -4,97 +4,119 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Game Room</title>
+    <title>Crazy Eights - Game</title>
     <link rel="stylesheet" href="/css/game.css">
     <link rel="stylesheet" href="/css/chat.css">
+    <style>
+        /* Game Info Bar */
+       
+    </style>
 </head>
 
 <body>
     <header>
         <nav>
-            <h1>Crazy Eights</h1>
+            <h1>🃏 Crazy Eights</h1>
             <div id="user-nav">
-                <span>Welcome, test user</span>
-                <button id="lobby-button" class="red-button"><a href="/lobby">Back to lobby</a></button>
+                <span id="welcome-msg">Welcome</span>                
+                <button id="lobby-button" class="red-button" onclick="window.location.href='/lobby'">Back to Lobby</button>
             </div>
         </nav>
     </header>
 
-    <div id="main">
-        <div id="players">
-            <div class="player" id="player-1">
-                <span class="player-name">Player 1</span>
-                <div class="player-hand">
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                </div>
-                <span class="card-count">3 Cards</span>
-            </div>
-
-            <div class="player" id="player-2">
-                <span class="player-name">Player 2</span>
-                <div class="player-hand">
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                </div>
-                <span class="card-count">2 Cards</span>
-            </div>
-
-            <div class="player" id="player-3">
-                <span class="player-name">Player 3</span>
-                <div class="player-hand">
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                    <div class="card card-back"></div>
-                </div>
-                <span class="card-count">5 Cards</span>
-            </div>
-        </div>
-
-        <div id="house">
-            <div id="deck">
-                <div class="card card-back">
-                    <span class="deck-label">DRAW</span>
-                </div>
-                <span class="pile-label">Draw Pile</span>
-            </div>
-            <div id="field">
-                <div class="card card-hearts">
-                    <span class="card-rank">8</span>
-                    <span class="card-suit">♥</span>
-                </div>
-                <span class="pile-label">Discard Pile</span>
-            </div>
-        </div>
-
-        <div id="hand">
-            <div class="card card-hearts playable" data-suit="hearts" data-rank="7">
-                <span class="card-rank">7</span>
-                <span class="card-suit">♥</span>
-            </div>
-            <div class="card card-spades" data-suit="spades" data-rank="K">
-                <span class="card-rank">K</span>
-                <span class="card-suit">♠</span>
-            </div>
-            <div class="card card-diamonds playable" data-suit="diamonds" data-rank="8">
-                <span class="card-rank">8</span>
-                <span class="card-suit">♦</span>
-            </div>
-            <div class="card card-clubs" data-suit="clubs" data-rank="3">
-                <span class="card-rank">3</span>
-                <span class="card-suit">♣</span>
-            </div>
+    <!-- Waiting Room -->
+    <div id="waiting-room">
+        <h2>🎴 Game Room</h2>
+        <div id="room-code">Room Code: <span id="code-display">-----</span></div>
+        <h3>Players</h3>
+        <ul id="member-list"></ul>
+        <div id="waiting-actions">
+            <button class="ready-btn" id="ready-btn">✓ Ready</button>
+            <button class="start-btn" id="start-btn">▶ Start New Game</button>
+            
+            <hr style="margin: 25px 0; border: none; border-top: 1px solid rgba(255,255,255,0.1);">
+                        <p style="color: var(--text-muted); font-size: 0.85rem; margin-bottom: 12px;">Or play against Computer</p>
+                        <div style="display:flex;gap:8px;align-items:center;">
+                            <label for="local-bot-count" style="font-size:0.9rem;color:var(--text-muted)">Against:</label>
+                            <select id="local-bot-count" style="background:var(--panel);color:var(--text);padding:1px;border-radius:1px;border:1px solid rgba(255,255,255,0.04)">
+                                <option value="1"> 1 </option>
+                                <option value="2"> 2 </option>
+                                <option value="3" selected> 3 </option>
+                            </select>
+                            <button class="start-btn" id="local-play-btn"> Play </button>
+                        </div>
         </div>
     </div>
 
-    <script src="/js/chat.js"></script>
+    <!-- Game Area -->
+    <div id="game-container" class="hidden">
+        <div id="game-info">
+            <div class="info-item">
+                <span class="info-label">Turn</span>
+                <span class="info-value" id="current-turn">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Active Suit</span>
+                <span class="info-value" id="active-suit-display">-</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Deck</span>
+                <span class="info-value"><span id="deck-count">52</span> cards</span>
+            </div>
+            <div class="info-item">
+                <span class="info-label">Status</span>
+                <span class="info-value" id="game-status">Playing</span>
+            </div>
+        </div>
+
+        <div id="main">
+            <div id="players"></div>
+
+            <div id="house">
+                <div id="deck">
+                    <div class="card card-back">
+                        <span class="deck-label">DRAW</span>
+                    </div>
+                    <span class="pile-label">Draw Pile</span>
+                </div>
+                <div id="field">
+                    <div class="card" id="top-card">
+                        <span class="card-rank">?</span>
+                        <span class="card-suit">?</span>
+                    </div>
+                    <span class="pile-label">Discard Pile</span>
+                </div>
+            </div>
+
+            <div id="hand"></div>
+        </div>
+    </div>
+
+    <!-- Toast Message -->
+    <div id="toast-message"></div>
+
+    <!-- Suit Selection Modal -->
+    <div id="suit-modal" class="suit-modal hidden">
+        <h3>🎯 Choose a suit</h3>
+        <div class="suit-buttons">
+            <button class="suit-btn hearts" data-suit="hearts">♥</button>
+            <button class="suit-btn diamonds" data-suit="diamonds">♦</button>
+            <button class="suit-btn clubs" data-suit="clubs">♣</button>
+            <button class="suit-btn spades" data-suit="spades">♠</button>
+        </div>
+    </div>
+
+    <!-- Winner Modal -->
+    <div id="winner-modal" class="hidden">
+        <h2 id="winner-text">🎉 Winner! 🎉</h2>
+        <button class="start-btn" id="new-game-btn"> New Game</button>
+        <button onclick="window.location.href='/lobby'">Back to Lobby</button>
+    </div>
+
     <script src="/socket.io/socket.io.js"></script>
-    <script src="js/game.js"></script>
+    <script src="/js/theme.js"></script>
+    <script src="/js/chat.js"></script>
+    <script src="/js/game.js"></script>
 </body>
 
 </html>

@@ -1,276 +1,490 @@
-* {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-}
+/* Lobby Page Styles */
+@import url('base.css');
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
 }
 
 header {
-    width: 100%;
-    position: absolute;
-    top: 0;
-    left: 0;
-    margin-top: 20px;
+  padding: 20px;
+  position: relative;
+  z-index: 10;
 }
 
 nav {
-    background-color: white;
-    padding: 20px 40px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    margin: 0 20px;
-    border-radius: 15px;
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-light) 100%);
+  padding: 18px 30px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-md);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(10px);
 }
 
 nav h1 {
-    font-size: 1.8rem;
+  font-size: 1.6rem;
+  color: var(--accent);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+nav h1::before {
+  content: '🃏';
+  font-size: 1.4rem;
 }
 
 #user-nav {
-    display: flex;
-    align-items: center;
-    gap: 15px;
+  display: flex;
+  align-items: center;
+  gap: 20px;
 }
 
 #user-nav span {
-    font-size: 1rem;
-    color: black;
+  font-size: 1rem;
+  color: var(--text-secondary);
+  font-weight: 500;
 }
 
 #main {
-    display: flex;
-    justify-content: space-around;
-    gap: 40px;
-    width: 100%;
-    height: 100%;
-    padding: 0 20px;
+  display: flex;
+  gap: 30px;
+  padding: 0 20px 30px;
+  flex: 1;
+  position: relative;
+  z-index: 1;
 }
 
 #create-room {
-    background-color: white;
-    width: 30%;
-    min-height: 500px;
-    border-radius: 15px;
-    padding: 30px;
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-light) 100%);
+  width: 320px;
+  min-width: 320px;
+  border-radius: var(--radius-xl);
+  padding: 30px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  height: fit-content;
+  position: sticky;
+  top: 20px;
 }
 
 #create-room h2 {
-    margin-bottom: 10px;
+  color: var(--accent);
+  margin-bottom: 10px;
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#create-room h2::before {
+  content: '➕';
+  font-size: 1.2rem;
 }
 
 #rooms {
-    background-color: white;
-    width: 60%;
-    min-height: 500px;
-    border-radius: 15px;
-    padding: 30px;
+  background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-light) 100%);
+  flex: 1;
+  border-radius: var(--radius-xl);
+  padding: 30px;
+  box-shadow: var(--shadow-lg);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+}
+
+#rooms h2 {
+  color: var(--accent);
+  margin-bottom: 20px;
+  font-size: 1.4rem;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+#rooms h2::before {
+  content: '🎮';
+  font-size: 1.2rem;
 }
 
 .gradient-button {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    font-weight: bold;
-    padding: 12px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
-    transition: transform 0.2s;
-    width: 100%;
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+  color: white;
+  font-weight: 700;
+  padding: 14px;
+  border-radius: var(--radius-md);
+  border: none;
+  font-size: 1rem;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  width: 100%;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  box-shadow: 0 4px 15px rgba(45, 90, 61, 0.4);
 }
 
 .gradient-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 5px 15px rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 25px rgba(45, 90, 61, 0.5);
 }
 
 .red-button {
-    background-color: red;
-    color: white;
-    font-weight: bold;
-    padding: 12px 20px;
-    border-radius: 8px;
-    border: none;
-    cursor: pointer;
+  background: linear-gradient(135deg, var(--error) 0%, var(--error-dark) 100%);
+  color: white;
+  font-weight: 600;
+  padding: 12px 24px;
+  border-radius: var(--radius-md);
+  border: none;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  box-shadow: 0 4px 15px rgba(243, 139, 168, 0.3);
+}
+
+.red-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(243, 139, 168, 0.4);
 }
 
 .form {
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .form span,
 .form label {
-    font-weight: 600;
-    color: #555;
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
 }
 
 input, select {
-    border-radius: 8px;
-    background-color: #f5f5f5;
-    font-size: 16px;
-    border: 2px solid #e0e0e0;
-    padding: 12px;
-    transition: border-color 0.3s;
+  border-radius: var(--radius-md);
+  background: var(--bg-input);
+  font-size: 1rem;
+  border: 2px solid var(--bg-card-light);
+  padding: 14px;
+  color: var(--text-primary);
+  transition: all var(--transition-normal);
 }
 
 input:focus, select:focus {
-    outline: none;
-    border-color: #667eea;
-    background-color: white;
+  outline: none;
+  border-color: var(--primary-light);
+  background: var(--bg-card);
+  box-shadow: 0 0 0 3px rgba(45, 90, 61, 0.2);
+}
+
+input::placeholder {
+  color: var(--text-muted);
+}
+
+select {
+  cursor: pointer;
+}
+
+select option {
+  background: var(--bg-card);
+  color: var(--text-primary);
 }
 
 #create-room > span {
-    display: flex;
-    align-items: center;
-    gap: 10px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 input[type="checkbox"] {
-    width: 20px;
-    height: 20px;
-    cursor: pointer;
+  width: 22px;
+  height: 22px;
+  cursor: pointer;
+  accent-color: var(--primary-light);
 }
 
 #create-room > span > span {
-    font-weight: 500;
-    color: #555;
-    cursor: pointer;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
 }
 
 /* Filter buttons */
 #filter {
-    display: flex;
-    gap: 10px;
-    margin-bottom: 25px;
-    flex-wrap: wrap;
+  display: flex;
+  gap: 10px;
+  margin-bottom: 25px;
+  flex-wrap: wrap;
 }
 
 #filter button {
-    padding: 10px 20px;
-    background: white;
-    border: 2px solid #e0e0e0;
-    border-radius: 20px;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s;
-    font-size: 0.95rem;
+  padding: 10px 20px;
+  background: var(--bg-input);
+  border: 2px solid var(--bg-card-light);
+  border-radius: var(--radius-full);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-normal);
+  font-size: 0.9rem;
+  color: var(--text-secondary);
 }
 
 #filter button:hover {
-    border-color: #667eea;
-    color: #667eea;
+  border-color: var(--primary-light);
+  color: var(--primary-light);
+  background: var(--bg-card-light);
 }
 
 #filter button.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: transparent;
+  background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+  color: var(--text-primary);
+  border-color: transparent;
 }
 
+/* Games list */
 #games {
-    display: flex;
-    flex-direction: column;
-    gap: 20px;
-    max-height: 400px;
-    overflow-y: auto;
-    padding: 10px;
-}
-
-#games::-webkit-scrollbar {
-    width: 8px;
-}
-
-#games::-webkit-scrollbar-track {
-    background: white;
-    border-radius: 10px;
-}
-
-#games::-webkit-scrollbar-thumb {
-    background: #667eea;
-    border-radius: 10px;
-}
-
-#games::-webkit-scrollbar-thumb:hover {
-    background: #5568d3;
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  flex: 1;
+  overflow-y: auto;
+  padding-right: 10px;
+  max-height: calc(100vh - 280px);
 }
 
 .game {
-    background-color: white;
-    border: 2px solid #e0e0e0;
-    border-radius: 12px;
-    padding: 20px 25px;
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    transition: all 0.3s;
-    min-height: auto;
-    max-height: none;
-    min-width: auto;
-    max-width: none;
+  background: var(--bg-input);
+  border: 2px solid var(--bg-card-light);
+  border-radius: var(--radius-lg);
+  padding: 20px 25px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  transition: all var(--transition-normal);
 }
 
 .game:hover {
-    transform: translateY(-2px);
-    border-color: #667eea;
-    background-color: #fff;
+  transform: translateY(-3px);
+  border-color: var(--primary-light);
+  background: var(--bg-card-light);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
 }
 
 .game-info {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 .game-name {
-    font-size: 1.2rem;
-    font-weight: 600;
-    color: black;
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: var(--text-primary);
 }
 
 .game-details {
-    display: flex;
-    gap: 15px;
-    align-items: center;
-    color: #666;
-    font-size: 0.9rem;
+  display: flex;
+  gap: 20px;
+  align-items: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
 }
 
 .game-details span {
-    display: flex;
-    align-items: center;
-    gap: 5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
 }
 
-.game .gradient-button {
-    width: auto;
-    min-width: 100px;
-    padding: 10px 25px;
-    font-size: 1rem;
+.game-details .players::before {
+  content: '👥';
+}
+
+.game-details .status {
+  padding: 4px 10px;
+  border-radius: var(--radius-full);
+  font-size: 0.8rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.game-details .status[data-status="waiting"] {
+  background: rgba(166, 227, 161, 0.2);
+  color: var(--success);
+}
+
+.game-details .status[data-status="in_progress"] {
+  background: rgba(250, 179, 135, 0.2);
+  color: var(--warning);
+}
+
+.game-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.game .gradient-button,
+.game .join-room {
+  width: auto;
+  min-width: 100px;
+  padding: 12px 25px;
+  font-size: 0.95rem;
+}
+
+.game .delete-room {
+  padding: 12px 20px;
+  font-size: 0.9rem;
 }
 
 .game .gradient-button:disabled {
-    background: #d0d0d0;
-    cursor: not-allowed;
-    transform: none;
-    box-shadow: none;
+  background: var(--bg-card-light);
+  color: var(--text-muted);
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
 }
 
-.game .gradient-button:disabled:hover {
-    transform: none;
-    box-shadow: none;
+/* Empty state */
+#games:empty::after {
+  content: 'No rooms available. Create one to get started!';
+  display: block;
+  text-align: center;
+  color: var(--text-muted);
+  padding: 60px 20px;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 1024px) {
+  #main {
+    flex-direction: column;
+  }
+  
+  #create-room {
+    width: 100%;
+    min-width: auto;
+    position: static;
+  }
+  
+  #games {
+    max-height: none;
+  }
+}
+
+/* Light Mode */
+[data-theme="light"] nav {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  box-shadow: 0 4px 20px rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] nav h1 {
+  color: var(--primary);
+}
+
+[data-theme="light"] #user-nav span {
+  color: #333;
+}
+
+[data-theme="light"] #create-room,
+[data-theme="light"] #rooms {
+  background: linear-gradient(135deg, #ffffff 0%, #f8f9fa 100%);
+  box-shadow: 0 10px 40px rgba(0,0,0,0.1);
+}
+
+[data-theme="light"] #create-room h2,
+[data-theme="light"] #rooms h2 {
+  color: var(--primary);
+}
+
+[data-theme="light"] input,
+[data-theme="light"] select {
+  background: #f5f5f5;
+  border-color: #e0e0e0;
+  color: #333;
+}
+
+[data-theme="light"] input:focus,
+[data-theme="light"] select:focus {
+  background: #fff;
+  border-color: var(--primary-light);
+}
+
+[data-theme="light"] .form span,
+[data-theme="light"] .form label {
+  color: #555;
+}
+
+[data-theme="light"] #filter button {
+  background: #f5f5f5;
+  border-color: #e0e0e0;
+  color: #555;
+}
+
+[data-theme="light"] #filter button:hover {
+  border-color: var(--primary-light);
+  color: var(--primary);
+}
+
+[data-theme="light"] .game {
+  background: #f8f9fa;
+  border-color: #e0e0e0;
+}
+
+[data-theme="light"] .game:hover {
+  background: #fff;
+  border-color: var(--primary-light);
+}
+
+[data-theme="light"] .game-name {
+  color: #333;
+}
+
+[data-theme="light"] .game-details {
+  color: #666;
+}
+
+@media (max-width: 768px) {
+  header {
+    padding: 15px;
+  }
+  
+  nav {
+    padding: 15px 20px;
+    flex-direction: column;
+    gap: 15px;
+  }
+  
+  nav h1 {
+    font-size: 1.4rem;
+  }
+  
+  #main {
+    padding: 0 15px 20px;
+  }
+  
+  #create-room,
+  #rooms {
+    padding: 25px 20px;
+  }
+  
+  .game {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 15px;
+  }
+  
+  .game-actions {
+    width: 100%;
+  }
+  
+  .game .gradient-button,
+  .game .join-room {
+    flex: 1;
+  }
 }

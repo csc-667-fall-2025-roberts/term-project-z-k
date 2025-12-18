@@ -1,19 +1,103 @@
-* {
-    margin: 0;
-    padding: 0;
-}
+/* Error Page Styles */
+@import url('base.css');
 
 body {
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    justify-content: center;
-    align-items: center;
     display: flex;
+    align-items: center;
+    justify-content: center;
     min-height: 100vh;
-    flex-direction: column;
-    color: white;
+    padding: 20px;
 }
 
-a {
-    color: white;
+.error-container {
+    position: relative;
+    z-index: 1;
+    width: 100%;
+    max-width: 500px;
+}
+
+.error-card {
+    background: linear-gradient(135deg, var(--bg-card) 0%, var(--bg-card-light) 100%);
+    padding: 60px 50px;
+    border-radius: var(--radius-xl);
+    text-align: center;
+    box-shadow: var(--shadow-lg);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    animation: scaleIn 0.4s ease;
+}
+
+.error-icon {
+    font-size: 5rem;
+    display: block;
+    margin-bottom: 20px;
+    animation: float 3s ease-in-out infinite;
+}
+
+@keyframes float {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-15px); }
+}
+
+.error-card h1 {
+    font-size: 6rem;
+    color: var(--accent);
+    margin-bottom: 10px;
+    line-height: 1;
+    text-shadow: 0 4px 20px rgba(255, 215, 0, 0.3);
+}
+
+.error-card h2 {
+    font-size: 1.5rem;
+    color: var(--text-primary);
+    margin-bottom: 15px;
+}
+
+.error-card p {
+    color: var(--text-muted);
+    font-size: 1.1rem;
+    margin-bottom: 35px;
+}
+
+.btn-home {
+    display: inline-block;
+    background: linear-gradient(135deg, var(--primary-light) 0%, var(--primary) 100%);
+    color: var(--text-primary);
+    font-weight: 700;
+    padding: 16px 40px;
+    border-radius: var(--radius-md);
+    text-decoration: none;
+    font-size: 1.1rem;
+    transition: all var(--transition-normal);
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    box-shadow: 0 4px 20px rgba(45, 90, 61, 0.4);
+}
+
+.btn-home:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 30px rgba(45, 90, 61, 0.5);
+    text-decoration: none;
+    color: var(--text-primary);
+}
+
+@media (max-width: 768px) {
+    .error-card {
+        padding: 40px 30px;
+    }
+    
+    .error-icon {
+        font-size: 4rem;
+    }
+    
+    .error-card h1 {
+        font-size: 4rem;
+    }
+    
+    .error-card h2 {
+        font-size: 1.3rem;
+    }
+    
+    .error-card p {
+        font-size: 1rem;
+    }
 }

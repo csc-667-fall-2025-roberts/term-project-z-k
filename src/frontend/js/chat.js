@@ -1,8 +1,8 @@
-// Client-side persistent chat (no server required)
-// Stores messages in localStorage so chat is constant across pages/tabs on the same origin.
+
 (function () {
   const STORAGE_KEY = 'globalChatMessages_v1';
   const NAME_KEY = 'globalChatName_v1';
+  const POS_KEY = 'globalChatPosition_v1';
 
   function escapeHtml(str) {
     return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
@@ -10,8 +10,7 @@
 
   function loadMessages() {
     try {
-      const raw = localStorage.getItem(STORAGE_KEY) || '[]';
-      return JSON.parse(raw);
+      return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]');
     } catch (e) {
       return [];
     }
@@ -21,52 +20,71 @@
     localStorage.setItem(STORAGE_KEY, JSON.stringify(msgs));
   }
 
-  // Try to get username from server session, fall back to localStorage prompt
+  function loadPosition() {
+    try {
+      return JSON.parse(localStorage.getItem(POS_KEY) || 'null');
+    } catch (e) {
+      return null;
+    }
+  }
+
+  function savePosition(pos) {
+    localStorage.setItem(POS_KEY, JSON.stringify(pos));
+  }
+
   async function getName() {
-    // check server first
     try {
       const resp = await fetch('/api/user', { credentials: 'same-origin' });
       if (resp.ok) {
         const data = await resp.json();
         if (data && data.username) {
-          // persist so other pages/tabs use same name
           localStorage.setItem(NAME_KEY, data.username);
           return data.username;
         }
       }
-    } catch (e) {
-      // ignore network errors and fall back
-    }
-
-    // fallback to local storage or prompt
-    let name = localStorage.getItem(NAME_KEY);
-    if (!name) {
-      name = 'Guest';
-      localStorage.setItem(NAME_KEY, name);
-    }
-    return name;
+    } catch (e) {}
+    return localStorage.getItem(NAME_KEY) || 'Guest';
   }
 
   function formatTime(ts) {
     const d = new Date(ts);
-    return d.toLocaleTimeString();
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    if (isToday) {
+      return d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return d.toLocaleDateString([], { month: 'short', day: 'numeric' }) + ' ' + 
+           d.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
   }
 
-  function render(container, msgs) {
+  function render(container, msgs, currentUser) {
     const list = container.querySelector('.chat-messages');
-    list.innerHTML = '';
-    msgs.forEach(m => {
-      const item = document.createElement('div');
-      item.className = 'chat-message';
-      item.innerHTML = `<span class="chat-meta">${escapeHtml(m.name)} <small>${formatTime(m.ts)}</small>:</span> <span class="chat-body">${escapeHtml(m.text)}</span>`;
-      list.appendChild(item);
-    });
-    // scroll to bottom
+    
+    if (msgs.length === 0) {
+      list.innerHTML = `<div class="chat-empty">
+        <span class="chat-empty-icon">💬</span>
+        <span>No messages yet</span>
+        <span style="font-size: 0.8rem; opacity: 0.7">Start the conversation!</span>
+      </div>`;
+      return;
+    }
+
+    list.innerHTML = msgs.map(m => {
+      const isOwn = m.name === currentUser;
+      const ownClass = isOwn ? 'own-message' : '';
+      return `<div class="chat-message ${ownClass}">
+        <div class="chat-meta">
+          <span class="chat-name">${escapeHtml(m.name)}</span>
+          <span class="chat-time">${formatTime(m.ts)}</span>
+        </div>
+        <span class="chat-body">${escapeHtml(m.text)}</span>
+      </div>`;
+    }).join('');
+    
     list.scrollTop = list.scrollHeight;
   }
 
   function createUI() {
-    // Avoid duplicate injection
     if (document.getElementById('global-chat')) return null;
 
     const container = document.createElement('div');
@@ -74,22 +92,163 @@
     container.className = 'chat-open';
     container.innerHTML = `
       <div class="chat-header">
-        <div style="display:flex;align-items:center;gap:8px;"><span>Global Chat</span><span class="chat-user" style="font-weight:400;color:#555;font-size:0.9em"></span></div>
+        <div class="chat-header-title">
+          <span class="chat-icon">💬</span>
+          <span>Chat</span>
+          <span class="chat-online"></span>
+          <span class="chat-user"></span>
+          <span class="chat-room-mode" style="display:none">ROOM</span>
+        </div>
         <div class="chat-controls">
-          <button class="chat-change" title="Change name">✎</button>
-          <button class="chat-toggle" title="Minimize">−</button>
-          <button class="chat-clear" title="Clear messages">🗑</button>
+          <button class="chat-toggle" title="Minimize">─</button>
+          <button class="chat-clear" title="Clear chat">🗑</button>
         </div>
       </div>
       <div class="chat-messages" aria-live="polite"></div>
       <div class="chat-input">
-        <input type="text" class="chat-text" placeholder="Type a message and press Enter" />
+        <input type="text" class="chat-text" placeholder="Type a message..." maxlength="500" />
         <button class="chat-send">Send</button>
       </div>
+      <div class="chat-resize-handle"></div>
     `;
 
     document.body.appendChild(container);
+    
+    // Restore position
+    const savedPos = loadPosition();
+    if (savedPos) {
+      container.style.right = 'auto';
+      container.style.bottom = 'auto';
+      container.style.left = savedPos.left + 'px';
+      container.style.top = savedPos.top + 'px';
+      if (savedPos.width) container.style.width = savedPos.width + 'px';
+      if (savedPos.height) container.style.height = savedPos.height + 'px';
+    }
+
     return container;
+  }
+
+  function setupDragging(container) {
+    const header = container.querySelector('.chat-header');
+    let isDragging = false;
+    let startX, startY, startLeft, startTop;
+
+    header.addEventListener('mousedown', (e) => {
+      if (e.target.closest('.chat-controls')) return;
+      
+      isDragging = true;
+      container.classList.add('chat-dragging');
+      
+      const rect = container.getBoundingClientRect();
+      startX = e.clientX;
+      startY = e.clientY;
+      startLeft = rect.left;
+      startTop = rect.top;
+      
+      // Switch from right/bottom to left/top positioning
+      container.style.right = 'auto';
+      container.style.bottom = 'auto';
+      container.style.left = startLeft + 'px';
+      container.style.top = startTop + 'px';
+      
+      e.preventDefault();
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      
+      const dx = e.clientX - startX;
+      const dy = e.clientY - startY;
+      
+      let newLeft = startLeft + dx;
+      let newTop = startTop + dy;
+      
+      // Keep within viewport
+      const rect = container.getBoundingClientRect();
+      newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width));
+      newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
+      
+      container.style.left = newLeft + 'px';
+      container.style.top = newTop + 'px';
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        container.classList.remove('chat-dragging');
+        
+        // Save position
+        const rect = container.getBoundingClientRect();
+        savePosition({
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    });
+
+    // Touch support for mobile
+    header.addEventListener('touchstart', (e) => {
+      if (e.target.closest('.chat-controls')) return;
+      
+      const touch = e.touches[0];
+      isDragging = true;
+      
+      const rect = container.getBoundingClientRect();
+      startX = touch.clientX;
+      startY = touch.clientY;
+      startLeft = rect.left;
+      startTop = rect.top;
+      
+      container.style.right = 'auto';
+      container.style.bottom = 'auto';
+      container.style.left = startLeft + 'px';
+      container.style.top = startTop + 'px';
+    }, { passive: true });
+
+    document.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      
+      const touch = e.touches[0];
+      const dx = touch.clientX - startX;
+      const dy = touch.clientY - startY;
+      
+      let newLeft = startLeft + dx;
+      let newTop = startTop + dy;
+      
+      const rect = container.getBoundingClientRect();
+      newLeft = Math.max(0, Math.min(newLeft, window.innerWidth - rect.width));
+      newTop = Math.max(0, Math.min(newTop, window.innerHeight - rect.height));
+      
+      container.style.left = newLeft + 'px';
+      container.style.top = newTop + 'px';
+    }, { passive: true });
+
+    document.addEventListener('touchend', () => {
+      if (isDragging) {
+        isDragging = false;
+        const rect = container.getBoundingClientRect();
+        savePosition({
+          left: rect.left,
+          top: rect.top,
+          width: rect.width,
+          height: rect.height
+        });
+      }
+    });
+
+    // Save size on resize
+    const resizeObserver = new ResizeObserver(() => {
+      if (!isDragging) {
+        const rect = container.getBoundingClientRect();
+        const pos = loadPosition() || {};
+        pos.width = rect.width;
+        pos.height = rect.height;
+        savePosition(pos);
+      }
+    });
+    resizeObserver.observe(container);
   }
 
   async function init() {
@@ -97,58 +256,64 @@
     const container = createUI();
     if (!container) return;
 
-    // If on a game room page and socket.io is available, use server-backed chat
+    setupDragging(container);
+
     const roomMatch = location.pathname.match(/\/game\/rooms\/(\d+)/);
     const roomId = roomMatch ? parseInt(roomMatch[1]) : null;
     const useServerChat = roomId && typeof window.io === 'function';
 
+    // Update user label
+    const userLabel = container.querySelector('.chat-user');
+    if (userLabel) userLabel.textContent = `(${name})`;
+
     if (useServerChat) {
-      // server-backed chat
+      container.querySelector('.chat-room-mode').style.display = 'inline';
       await setupServerChat(container, roomId, name);
-      return;
+    } else {
+      const msgs = loadMessages();
+      render(container, msgs, name);
+      setupLocalChat(container, name);
     }
 
-    const msgs = loadMessages();
-    render(container, msgs);
+    // Setup toggle/minimize
+    const toggleBtn = container.querySelector('.chat-toggle');
+    toggleBtn.addEventListener('click', () => {
+      const isMin = container.classList.contains('chat-min');
+      container.classList.toggle('chat-open', isMin);
+      container.classList.toggle('chat-min', !isMin);
+      toggleBtn.textContent = isMin ? '─' : '+';
+      toggleBtn.title = isMin ? 'Minimize' : 'Expand';
+    });
 
+    // Click on minimized chat to expand
+    container.addEventListener('click', (e) => {
+      if (container.classList.contains('chat-min') && !e.target.closest('.chat-controls')) {
+        container.classList.remove('chat-min');
+        container.classList.add('chat-open');
+        toggleBtn.textContent = '─';
+      }
+    });
+  }
+
+  function setupLocalChat(container, name) {
     const input = container.querySelector('.chat-text');
     const sendBtn = container.querySelector('.chat-send');
-    const toggleBtn = container.querySelector('.chat-toggle');
     const clearBtn = container.querySelector('.chat-clear');
-  const changeBtn = container.querySelector('.chat-change');
-  const userLabel = container.querySelector('.chat-user');
 
     function postMessage(text) {
       const trimmed = text.trim();
       if (!trimmed) return;
-      // always read latest name from localStorage in case it changed
+      
       const currentName = localStorage.getItem(NAME_KEY) || name || 'Guest';
       const m = { name: currentName, text: trimmed, ts: Date.now() };
       const list = loadMessages();
       list.push(m);
-      // keep last 200 messages
       if (list.length > 200) list.splice(0, list.length - 200);
       saveMessages(list);
-      render(container, list);
-      // notify other tabs
-      try { window.localStorage.setItem('globalChat:signal', Date.now().toString()); } catch (e) {}
+      render(container, list, currentName);
+      
+      try { localStorage.setItem('globalChat:signal', Date.now().toString()); } catch (e) {}
     }
-
-    function updateUserLabel() {
-      const cur = localStorage.getItem(NAME_KEY) || name || 'Guest';
-      if (userLabel) userLabel.textContent = `(${cur})`;
-    }
-
-    updateUserLabel();
-
-    changeBtn?.addEventListener('click', () => {
-      const cur = localStorage.getItem(NAME_KEY) || name || '';
-      const newName = cur || 'Guest';
-      localStorage.setItem(NAME_KEY, newName);
-      updateUserLabel();
-      // notify other tabs
-      try { window.localStorage.setItem(NAME_KEY, newName); } catch (e) {}
-    });
 
     sendBtn.addEventListener('click', () => {
       postMessage(input.value);
@@ -157,115 +322,175 @@
     });
 
     input.addEventListener('keydown', (ev) => {
-      if (ev.key === 'Enter') {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
         postMessage(input.value);
         input.value = '';
       }
     });
 
-    toggleBtn.addEventListener('click', () => {
-      if (container.classList.contains('chat-open')) {
-        container.classList.remove('chat-open');
-        container.classList.add('chat-min');
-        toggleBtn.textContent = '+';
-        toggleBtn.title = 'Expand';
-      } else {
-        container.classList.remove('chat-min');
-        container.classList.add('chat-open');
-        toggleBtn.textContent = '−';
-        toggleBtn.title = 'Minimize';
-      }
-    });
-
     clearBtn.addEventListener('click', () => {
-      if (!confirm('Clear all chat messages for this browser?')) return;
+      if (!confirm('Clear all chat messages?')) return;
       saveMessages([]);
-      render(container, []);
+      render(container, [], name);
     });
 
-    // listen for storage signals from other tabs/windows
     window.addEventListener('storage', (ev) => {
       if (ev.key === STORAGE_KEY || ev.key === 'globalChat:signal') {
-        const updated = loadMessages();
-        render(container, updated);
-      }
-      if (ev.key === NAME_KEY) {
-        // name changed/cleared in another tab — update header label
-        updateUserLabel();
+        const currentName = localStorage.getItem(NAME_KEY) || name || 'Guest';
+        render(container, loadMessages(), currentName);
       }
     });
   }
 
-  // initialize when DOM ready
+  async function setupServerChat(container, roomId, name) {
+    const userResp = await fetch('/api/user', { credentials: 'same-origin' }).catch(() => null);
+    const userData = userResp && userResp.ok ? await userResp.json() : {};
+    const username = userData.username || localStorage.getItem(NAME_KEY) || name || 'Guest';
+
+    const userLabel = container.querySelector('.chat-user');
+    if (userLabel) userLabel.textContent = `(${username})`;
+
+    // Hide clear button for server chat
+    const clearBtn = container.querySelector('.chat-clear');
+    if (clearBtn) clearBtn.style.display = 'none';
+
+    if (typeof window.io !== 'function') {
+      const msgs = loadMessages();
+      render(container, msgs, username);
+      setupLocalChat(container, username);
+      return;
+    }
+
+    const socket = io();
+    socket.emit('joinChat', { roomId });
+
+    // Load existing messages
+    try {
+      const res = await fetch(`/api/chat/rooms/${roomId}/messages`, { credentials: 'same-origin' });
+      if (res.ok) {
+        const rows = await res.json();
+        const msgs = rows.map(r => ({ 
+          name: r.username || 'Unknown', 
+          text: r.message, 
+          ts: new Date(r.sent_at).getTime() 
+        }));
+        render(container, msgs, username);
+      }
+    } catch (e) {
+      console.error('Failed to load messages:', e);
+    }
+
+    // Listen for new messages
+    socket.on('chat:message', (m) => {
+      const listEl = container.querySelector('.chat-messages');
+      const emptyEl = listEl.querySelector('.chat-empty');
+      if (emptyEl) emptyEl.remove();
+
+      const isOwn = m.username === username;
+      const item = document.createElement('div');
+      item.className = `chat-message ${isOwn ? 'own-message' : ''}`;
+      item.innerHTML = `
+        <div class="chat-meta">
+          <span class="chat-name">${escapeHtml(m.username || 'Unknown')}</span>
+          <span class="chat-time">${formatTime(new Date(m.sent_at).getTime())}</span>
+        </div>
+        <span class="chat-body">${escapeHtml(m.message)}</span>
+      `;
+      listEl.appendChild(item);
+      listEl.scrollTop = listEl.scrollHeight;
+
+      // Show notification if minimized
+      if (container.classList.contains('chat-min') && !isOwn) {
+        showNotificationBadge(container);
+      }
+    });
+
+    // Input handlers
+    const input = container.querySelector('.chat-text');
+    const sendBtn = container.querySelector('.chat-send');
+
+    async function sendMessage() {
+      const text = input.value.trim();
+      if (!text) return;
+
+      try {
+        const res = await fetch(`/api/chat/rooms/${roomId}/messages`, {
+          method: 'POST',
+          credentials: 'same-origin',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: text })
+        });
+
+        if (!res.ok) {
+          if (res.status === 401) {
+            showChatError(container, 'Please log in to chat');
+          } else {
+            const d = await res.json().catch(() => ({}));
+            showChatError(container, d.error || 'Failed to send');
+          }
+        } else {
+          input.value = '';
+        }
+      } catch (e) {
+        showChatError(container, 'Network error');
+      }
+    }
+
+    sendBtn.addEventListener('click', sendMessage);
+    input.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Enter' && !ev.shiftKey) {
+        ev.preventDefault();
+        sendMessage();
+      }
+    });
+
+    window.addEventListener('beforeunload', () => {
+      try {
+        socket.emit('leaveChat', { roomId });
+        socket.disconnect();
+      } catch (e) {}
+    });
+  }
+
+  function showNotificationBadge(container) {
+    let badge = container.querySelector('.chat-badge');
+    if (!badge) {
+      badge = document.createElement('span');
+      badge.className = 'chat-badge';
+      badge.textContent = '1';
+      container.querySelector('.chat-header').appendChild(badge);
+    } else {
+      const count = parseInt(badge.textContent) || 0;
+      badge.textContent = Math.min(count + 1, 99);
+    }
+
+    // Remove badge when expanded
+    const observer = new MutationObserver(() => {
+      if (container.classList.contains('chat-open')) {
+        badge.remove();
+        observer.disconnect();
+      }
+    });
+    observer.observe(container, { attributes: true, attributeFilter: ['class'] });
+  }
+
+  function showChatError(container, message) {
+    const listEl = container.querySelector('.chat-messages');
+    const errorEl = document.createElement('div');
+    errorEl.className = 'chat-message system';
+    errorEl.textContent = '⚠️ ' + message;
+    listEl.appendChild(errorEl);
+    listEl.scrollTop = listEl.scrollHeight;
+    
+    setTimeout(() => errorEl.remove(), 5000);
+  }
+
+  // Initialize
   if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', init);
   } else {
     init();
-  }
-
-  // --- server-backed chat helpers ---
-  async function setupServerChat(container, roomId, name) {
-    const userResp = await fetch('/api/user', { credentials: 'same-origin' }).catch(()=>null);
-    const userData = userResp && userResp.ok ? await userResp.json() : {};
-    const username = userData.username || localStorage.getItem(NAME_KEY) || name || 'Guest';
-
-    // show username in header
-    const userLabel = container.querySelector('.chat-user');
-    if (userLabel) userLabel.textContent = `(${username})`;
-
-    // connect socket
-    if (typeof window.io !== 'function') {
-      // fallback
-      const msgs = loadMessages(); render(container, msgs); return;
-    }
-    const socket = io();
-    socket.emit('joinChat', { roomId });
-
-    // load recent messages from server
-    const res = await fetch(`/api/chat/rooms/${roomId}/messages`, { credentials: 'same-origin' });
-    if (res.ok) {
-      const rows = await res.json();
-      // normalize to {name, text, ts}
-      const msgs = rows.map(r => ({ name: r.username || 'unknown', text: r.message, ts: new Date(r.sent_at).getTime() }));
-      render(container, msgs);
-    }
-
-    // listen for incoming messages
-    socket.on('chat:message', (m) => {
-      const list = loadMessages();
-      const entry = { name: m.username || 'unknown', text: m.message, ts: new Date(m.sent_at).getTime() };
-      // append to UI directly
-      const listEl = container.querySelector('.chat-messages');
-      const item = document.createElement('div'); item.className = 'chat-message';
-      item.innerHTML = `<span class="chat-meta">${escapeHtml(entry.name)} <small>${formatTime(entry.ts)}</small>:</span> <span class="chat-body">${escapeHtml(entry.text)}</span>`;
-      listEl.appendChild(item);
-      listEl.scrollTop = listEl.scrollHeight;
-    });
-
-    // override postMessage to send to server
-    const input = container.querySelector('.chat-text');
-    const sendBtn = container.querySelector('.chat-send');
-
-    sendBtn.addEventListener('click', async () => {
-      const text = input.value.trim(); if (!text) return;
-      const p = await fetch(`/api/chat/rooms/${roomId}/messages`, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: text }) });
-      if (!p.ok) {
-        if (p.status === 401) {
-          alert('You must be logged in to use room chat.');
-        } else {
-          const d = await p.json().catch(()=>({}));
-          alert('Failed to send message: ' + (d.error || p.statusText));
-        }
-      } else {
-        input.value = '';
-      }
-    });
-    input.addEventListener('keydown', async (ev) => { if (ev.key === 'Enter') { ev.preventDefault(); sendBtn.click(); } });
-
-    // cleanup on unload
-    window.addEventListener('beforeunload', () => {
-      try { socket.emit('leaveChat', { roomId }); socket.disconnect(); } catch (e) {}
-    });
   }
 
 })();
