@@ -77,25 +77,75 @@ const getGames = async () => {
 }
 
 const setGames = async () => {
-    const games = await getGames();
+        // Use new endpoint that includes waiting and in_progress rooms and joined flag
+        const games = await fetch('/api/game/rooms/all').then(r => r.ok ? r.json() : []);
 
-    document.querySelector('#games').innerHTML = games.map(game => {
-        const isHost = window.currentUserId && Number(window.currentUserId) === Number(game.host_id);
-        return `<div id="game-${game.id}" class="game">
-                    <div class="game-info">
-                        <div class="game-name">${game.name}</div>
-                        <div class="game-details">
-                            <span class="players">${game.player_count || 1}/${game.max_players} players</span>
-                            <span class="status">${game.status}</span>
+        // Partition into waiting and in_progress
+        // Treat rooms as in-progress for this user if the room status is 'in_progress' OR the user has marked ready (user_ready)
+        const waiting = games.filter(g => g.status === 'waiting' && !g.user_ready);
+        const inProgress = games.filter(g => g.status === 'in_progress' || g.user_ready);
+
+        function renderList(list) {
+                if (!list || list.length === 0) return `<div class="no-rooms">No rooms</div>`;
+
+                return list.map(game => {
+                        const isHost = window.currentUserId && Number(window.currentUserId) === Number(game.host_id);
+                        const joined = !!game.joined;
+                        const playerCount = game.player_count || 0;
+                return `<div id="game-${game.id}" class="game">
+                        <div class="game-info">
+                            <div class="game-name">${game.name}</div>
+                            <div class="game-details">
+                                <span class="players">${playerCount}/${game.max_players} players</span>
+                                <span class="status">${game.status}${game.user_ready ? ' (You ready)' : ''}</span>
+                            </div>
                         </div>
-                    </div>
-                    <div class="game-actions">
-                      <button class="gradient-button join-room" data-room-id="${game.id}">Join</button>
-                      ${isHost ? `<button class="delete-room red-button" data-room-id="${game.id}">Delete</button>` : ''}
-                    </div>
-                </div>`
-    }).join('');
+                        <div class="game-actions">
+                          ${joined ? `<button class="gradient-button enter-room" data-room-id="${game.id}">Enter</button>` : `<button class="gradient-button join-room" data-room-id="${game.id}">Join</button>`}
+                          ${isHost ? `<button class="toggle-status small-button" data-room-id="${game.id}" data-new-status="${game.status === 'waiting' ? 'in_progress' : 'waiting'}">${game.status === 'waiting' ? 'Set In Progress' : 'Set Waiting'}</button>` : ''}
+                          ${isHost ? `<button class="delete-room red-button" data-room-id="${game.id}">Delete</button>` : ''}
+                        </div>
+                    </div>`
+                }).join('');
+        }
+
+        document.querySelector('#games').innerHTML = `
+            <div class="rooms-section">
+                <h3>Waiting</h3>
+                <div class="rooms-list">${renderList(waiting)}</div>
+            </div>
+            <div class="rooms-section">
+                <h3>In Progress</h3>
+                <div class="rooms-list">${renderList(inProgress)}</div>
+            </div>
+        `;
 }
+
+    // Filter buttons handler (All / Waiting / In Progress)
+    document.querySelector('#filter').addEventListener('click', (e) => {
+        const btn = e.target;
+        if (!(btn instanceof HTMLElement) || btn.tagName.toLowerCase() !== 'button') return;
+
+        // mark active
+        document.querySelectorAll('#filter button').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+
+        const text = btn.textContent?.trim().toLowerCase();
+        const sections = Array.from(document.querySelectorAll('.rooms-section'));
+        if (!text) return;
+
+        if (text === 'all') {
+            sections.forEach(s => s.style.display = 'block');
+        } else if (text === 'waiting') {
+            sections.forEach(s => {
+                if (s.querySelector('h3')?.textContent?.toLowerCase().includes('waiting')) s.style.display = 'block'; else s.style.display = 'none';
+            });
+        } else if (text === 'in progress') {
+            sections.forEach(s => {
+                if (s.querySelector('h3')?.textContent?.toLowerCase().includes('in progress')) s.style.display = 'block'; else s.style.display = 'none';
+            });
+        }
+    });
 
 // Event delegation for join/delete actions
 document.querySelector('#games').addEventListener('click', async (e) => {
@@ -108,6 +158,13 @@ document.querySelector('#games').addEventListener('click', async (e) => {
         if (roomId) {
             window.location.href = `/game/rooms/${roomId}`;
         }
+        return;
+    }
+
+    // Enter room (already joined) - navigate to game page
+    if (target.matches('.enter-room')) {
+        const roomId = target.getAttribute('data-room-id');
+        if (roomId) window.location.href = `/game/rooms/${roomId}`;
         return;
     }
 
@@ -139,11 +196,74 @@ document.querySelector('#games').addEventListener('click', async (e) => {
             alert('Failed to delete room');
         }
     }
+    
+    // Toggle status (host only)
+    if (target.matches('.toggle-status')) {
+        const roomId = target.getAttribute('data-room-id');
+        const newStatus = target.getAttribute('data-new-status');
+        if (!roomId || !newStatus) return;
+        try {
+            if (newStatus === 'in_progress') {
+                // Use the start endpoint so the full game-start flow runs (assign orders, create game)
+                const res = await fetch(`/api/game/rooms/${roomId}/start`, {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (res.ok) {
+                    await setGames();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    alert('Failed to start game: ' + (data.error || res.statusText));
+                }
+            } else {
+                // Fall back to status toggle (e.g., set to waiting)
+                const res = await fetch(`/api/game/rooms/${roomId}/status`, {
+                    method: 'PATCH',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ status: newStatus })
+                });
+
+                if (res.ok) {
+                    await setGames();
+                } else {
+                    const data = await res.json().catch(() => ({}));
+                    alert('Failed to change status: ' + (data.error || res.statusText));
+                }
+            }
+        } catch (err) {
+            console.error('Toggle status error', err);
+            alert('Failed to change status');
+        }
+        return;
+    }
 });
 
 document.addEventListener('DOMContentLoaded', async () => {
     await setUsername();
     await setGames();
+    // Initialize socket and listen for room changes so lobby refreshes automatically
+    try {
+        if (typeof io !== 'undefined') {
+            const socket = io();
+            socket.on('connect', () => {
+                // optionally join a lobby namespace or room here
+                // console.log('Lobby socket connected');
+            });
+
+            socket.on('room:statusChanged', (payload) => {
+                // payload may contain { roomId, status }
+                setGames();
+            });
+
+            socket.on('room:created', () => setGames());
+            socket.on('room:deleted', () => setGames());
+        }
+    } catch (e) {
+        console.warn('Socket.io not available on this page', e);
+    }
 });
 
 // Logout button handler — call server to destroy session then redirect to login

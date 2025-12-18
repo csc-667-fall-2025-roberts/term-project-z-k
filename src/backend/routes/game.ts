@@ -31,6 +31,30 @@ router.get('/rooms', async (_req, res) => {
   }
 });
 
+// Get public rooms (waiting + in_progress) and include player counts and whether
+// the current session user has already joined each room
+router.get('/rooms/all', async (req, res) => {
+  try {
+    const userId = Number(req.session?.userId) || 0;
+
+    const result = await (await import('../db/database')).db.query(
+      `SELECT r.*, 
+         (SELECT COUNT(*) FROM room_members WHERE room_id = r.id) AS player_count,
+         (SELECT COUNT(*) FROM room_members WHERE room_id = r.id AND user_id = $1) > 0 AS joined,
+         COALESCE((SELECT is_ready FROM room_members WHERE room_id = r.id AND user_id = $1), false) AS user_ready
+       FROM rooms r
+       WHERE r.is_private = false
+         AND r.status IN ('waiting', 'in_progress')
+       ORDER BY CASE WHEN r.status = 'waiting' THEN 0 ELSE 1 END, r.created_at DESC`,
+      [userId]
+    );
+
+    res.json(result.rows);
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Get a specific room with members
 router.get('/rooms/:roomId', async (req, res) => {
   try {
@@ -196,6 +220,43 @@ router.delete('/rooms/:roomId', async (req, res) => {
   }
 });
 
+// Host-only: change room status (e.g., waiting <-> in_progress)
+router.patch('/rooms/:roomId/status', async (req, res) => {
+  try {
+    const roomId = parseInt(req.params.roomId);
+    const { status } = req.body;
+    const userId = Number(req.session.userId);
+
+    if (isNaN(roomId)) return res.status(400).json({ error: 'Invalid room ID' });
+    if (!status || (status !== 'waiting' && status !== 'in_progress')) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    const room = await RoomService.getRoomById(roomId);
+    if (!room) return res.status(404).json({ error: 'Room not found' });
+
+    if (Number(room.host_id) !== Number(userId)) {
+      return res.status(403).json({ error: 'Only the host may change room status' });
+    }
+
+    await RoomService.updateRoomStatus(roomId, status);
+
+    // Notify via socket if available
+    try {
+      const io = (req.app.locals && req.app.locals.io) ? req.app.locals.io : null;
+      if (io) {
+        io.emit('room:statusChanged', { roomId, status });
+      }
+    } catch (e) {
+      console.warn('Failed to emit room:statusChanged', e);
+    }
+
+    res.json({ success: true, status });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // Start a game
 router.post('/rooms/:roomId/start', async (req, res) => {
   try {
@@ -228,7 +289,9 @@ router.post('/rooms/:roomId/start', async (req, res) => {
     try {
       const io = (req.app.locals && req.app.locals.io) ? req.app.locals.io : null;
       if (io) {
+        // Emit to both the new game-id channel and the pre-start room channel (roomId)
         io.to(`game:${game.id}`).emit('game:started', { gameId: game.id });
+        io.to(`game:${roomId}`).emit('game:started', { gameId: game.id });
       }
     } catch (e) {
       console.warn('Failed to emit game:started', e);
