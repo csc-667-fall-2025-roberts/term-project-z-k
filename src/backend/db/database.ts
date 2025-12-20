@@ -3,6 +3,16 @@ import * as fs from 'fs';
 import * as path from 'path';
 import * as dotenv from 'dotenv';
 
+import pkg from "pg";
+const { Pool: PgPool } = pkg;
+
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL,
+  ssl: {
+    rejectUnauthorized: false
+  }
+});
+
 dotenv.config();
 
 const SCHEMA_PATH = path.join(__dirname, 'schema.sql');
