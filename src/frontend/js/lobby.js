@@ -102,7 +102,6 @@ const setGames = async () => {
                         </div>
                         <div class="game-actions">
                           ${joined ? `<button class="gradient-button enter-room" data-room-id="${game.id}">Enter</button>` : `<button class="gradient-button join-room" data-room-id="${game.id}">Join</button>`}
-                          ${isHost ? `<button class="toggle-status small-button" data-room-id="${game.id}" data-new-status="${game.status === 'waiting' ? 'in_progress' : 'waiting'}">${game.status === 'waiting' ? 'Set In Progress' : 'Set Waiting'}</button>` : ''}
                           ${isHost ? `<button class="delete-room red-button" data-room-id="${game.id}">Delete</button>` : ''}
                         </div>
                     </div>`
