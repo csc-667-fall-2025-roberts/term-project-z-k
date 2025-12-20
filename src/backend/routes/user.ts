@@ -82,7 +82,8 @@ router.post("/login", async (req: Request, res: Response) => {
 
     req.session.userId = user.id;
     req.session.username = user.username;
-
+   
+    /*    
     await new Promise<void>((resolve, reject) => {
       req.session.save((err) => {
         if (err) {
@@ -100,6 +101,39 @@ router.post("/login", async (req: Request, res: Response) => {
       username: user.username,
       email: user.email,
       message: 'Successfully logged in'
+    });
+
+  } catch (err: any) {
+    console.error('Login error:', err);
+    return res.status(500).json({
+      error: 'Failed to login'
+    });
+  }
+});
+*/
+     // Save session with callback to ensure it's saved before responding
+    req.session.save((err) => {
+      if (err) {
+        console.error('Session save error:', err);
+        return res.status(500).json({
+          error: 'Failed to save session'
+        });
+      }
+      
+      // Set session cookie explicitly
+      res.cookie('connect.sid', req.sessionID, {
+        httpOnly: true,
+        sameSite: 'lax', // or 'strict' depending on your needs
+        secure: process.env.NODE_ENV === 'production',
+        maxAge: 1000 * 60 * 60 * 24 // 24 hours
+      });
+
+      return res.status(200).json({
+        id: user.id,
+        username: user.username,
+        email: user.email,
+        message: 'Successfully logged in'
+      });
     });
 
   } catch (err: any) {
