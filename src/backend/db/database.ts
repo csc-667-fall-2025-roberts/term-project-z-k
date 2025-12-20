@@ -1,4 +1,4 @@
-//AI code to connect to Render vs locally deployed
+
 import { Pool, PoolClient } from 'pg';
 import * as fs from 'fs';
 import * as path from 'path';
