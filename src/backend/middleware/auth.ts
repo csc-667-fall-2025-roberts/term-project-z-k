@@ -24,8 +24,8 @@ export function auth(req: Request, res: Response, next: NextFunction) {
 
 export function loggedIn(req: Request, res: Response, next: NextFunction) {
     const userId = req.session?.userId;
-
-    if (userId && req.path.includes('signup') || userId && req.path.includes('login')) {
+    
+    if (userId && (req.path.includes('signup') || req.path.includes('login'))) {
         return res.redirect('/lobby');
     }
 
