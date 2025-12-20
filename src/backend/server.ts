@@ -51,10 +51,10 @@ app.use(session({
   },
 }));
 
-app.set("trust proxy", 1);
 app.use(morgan("dev"));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
+app.use(express.static(path.join(__dirname, "../frontend")));
 app.set("views", path.join(__dirname, "views"));
 app.set("view engine", "ejs");
 
@@ -63,8 +63,6 @@ app.use("/api/game", gameRoutes);
 app.use("/api/user", userRoutes);
 app.use("/api/chat", chatRoutes);
 app.use("/", rootRoutes);
-
-app.use(express.static(path.join(__dirname, "../frontend")));
 
 // Create HTTP server and attach socket.io for real-time events
 const httpServer = createServer(app);
@@ -115,7 +113,7 @@ const startServer = async () => {
   try {
     await initializeDatabase();
     
-    httpServer.listen(PORT, "0.0.0.0", () => {
+    httpServer.listen(PORT, () => {
       console.log(`Server started on port ${PORT}`);
     });
   } catch (error) {
