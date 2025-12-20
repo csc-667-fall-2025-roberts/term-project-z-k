@@ -3,6 +3,7 @@ import express from "express";
 import morgan from "morgan";
 import createHttpError from "http-errors";
 import "./db/database";
+import { initializeDatabase, db } from "./db/database";
 
 import rootRoutes from "./routes/root";
 import { testRouter } from "./routes/test";
@@ -33,15 +34,15 @@ const pgPool = new pg.Pool({
 // Configure the session middleware
 app.use(session({
   store: new PgStore({
-    pool: pgPool,
+    pool: db as any,
     tableName: 'session', // Name of your session table
   }),
-  secret: 'testtestset', // Replace with a strong, unique secret
+  secret: process.env.SESSION_SECRET || 'testtestset', // Replace with a strong, unique secret
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-    secure: false, // Set to true in production with HTTPS
+    secure: process.env.NODE_ENV === 'production', // Set to true in production with HTTPS
     httpOnly: true,
     sameSite: 'lax',
   },
@@ -104,7 +105,21 @@ io.on('connection', (socket) => {
   });
 });
 
+// Start server only after database is ready
+const startServer = async () => {
+  try {
+    await initializeDatabase();
+    
+    httpServer.listen(PORT, () => {
+      console.log(`Server started on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
 
+startServer();
 
 // Error handler
 app.use((error: any, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
