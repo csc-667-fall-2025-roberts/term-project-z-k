@@ -3,6 +3,7 @@ import express from "express";
 import morgan from "morgan";
 import createHttpError from "http-errors";
 import "./db/database";
+import { initializeDatabase, db } from "./db/database";
 
 import rootRoutes from "./routes/root";
 import { testRouter } from "./routes/test";
@@ -15,7 +16,6 @@ import { Server as IOServer } from 'socket.io';
 import session from "express-session";
 import connectPgSimple from 'connect-pg-simple';
 import pg from 'pg';
-import { RoomService } from './services/roomService';
 
 const app = express();
 
@@ -23,6 +23,8 @@ const PORT = process.env.PORT || 3000;
 
 const PgStore = connectPgSimple(session);
 
+/*
+//duplicate pool from before connecting to render
 const pgPool = new pg.Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -30,19 +32,20 @@ const pgPool = new pg.Pool({
   password: process.env.DB_PASSWORD || 'postgres',
   port: parseInt(process.env.DB_PORT || '5432'),
 });
+*/
 
 // Configure the session middleware
 app.use(session({
   store: new PgStore({
-    pool: pgPool,
+    pool: db as any,
     tableName: 'session', // Name of your session table
   }),
-  secret: 'testtestset', // Replace with a strong, unique secret
+  secret: process.env.SESSION_SECRET || 'testtestset', // Replace with a strong, unique secret
   resave: false,
   saveUninitialized: false,
   cookie: {
     maxAge: 1000 * 60 * 60 * 24 * 7, // 1 week
-    secure: false, // Set to true in production with HTTPS
+    secure: process.env.NODE_ENV === 'production', // Set to true in production with HTTPS
     httpOnly: true,
     sameSite: 'lax',
   },
@@ -100,68 +103,24 @@ io.on('connection', (socket) => {
     console.log(`socket ${socket.id} left chat ${room}`);
   });
 
-  socket.on('lobby:join', async ({ roomId, userId }) => {
-    try {
-      const room = await RoomService.getRoomById(roomId);
-      if (!room) return socket.emit('lobby:error', { message: 'Room not found' });
-
-      if (await RoomService.isRoomFull(room.id)) {
-        return socket.emit('lobby:error', { message: 'Room is full' });
-      }
-
-      await RoomService.addMember(roomId, userId);
-      socket.join(`lobby:${roomId}`);
-
-      const roomWithMembers = await RoomService.getRoomWithMembers(roomId);
-      socket.emit('lobby:joined', { room: roomWithMembers });
-      io.to(`lobby:${roomId}`).emit('lobby:memberUpdate', { room: roomWithMembers });
-    } catch (error: any) {
-      socket.emit('lobby:error', { message: error.message });
-    }
-  });
-
-  socket.on('lobby:joinRoom', ({ roomId }) => {
-    socket.join(`lobby:${roomId}`);
-    console.log(`socket ${socket.id} joined lobby room ${roomId}`);
-  });
-
-  socket.on('lobby:ready', async ({ roomId, userId, isReady }) => {
-    try {
-      await RoomService.setPlayerReady(roomId, userId, isReady);
-      const roomWithMembers = await RoomService.getRoomWithMembers(roomId);
-
-      io.to(`lobby:${roomId}`).emit('lobby:readyUpdate', {
-        room: roomWithMembers,
-        userId,
-        isReady
-      });
-    } catch (error: any) {
-      socket.emit('lobby:error', { message: error.message });
-    }
-  });
-
-  socket.on('lobby:leave', async ({ roomId, userId }) => {
-    try {
-      socket.leave(`lobby:${roomId}`);
-      await RoomService.removeMember(roomId, userId);
-
-      // Check if room is empty
-      const members = await RoomService.getRoomMembers(roomId);
-      if (members.length === 0) {
-        await RoomService.deleteRoom(roomId);
-        io.emit('room:deleted', { roomId });
-      }
-    } catch (error) {
-      console.error('Error leaving lobby:', error);
-    }
-  });
-
   socket.on('disconnect', () => {
     console.log('socket disconnected:', socket.id);
   });
 });
 
-
+// Start server only after database is ready
+const startServer = async () => {
+  try {
+    await initializeDatabase();
+    
+    httpServer.listen(PORT, () => {
+      console.log(`Server started on port ${PORT}`);
+    });
+  } catch (error) {
+    console.error('Failed to start server:', error);
+    process.exit(1);
+  }
+};
 
 // Error handler
 app.use((error: any, _request: express.Request, response: express.Response, _next: express.NextFunction) => {
@@ -174,6 +133,4 @@ app.use((error: any, _request: express.Request, response: express.Response, _nex
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
-});
+startServer();
