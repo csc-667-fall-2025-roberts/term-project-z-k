@@ -12,23 +12,32 @@ class DatabaseManager {
   private pool: Pool;
   private initialized: boolean = false;
 
-  constructor() {
-    // Use DATABASE_URL if available (Render provides this)
-    // Otherwise fall back to individual connection parameters
-    const poolConfig = process.env.DATABASE_URL
-      ? {
-          connectionString: process.env.DATABASE_URL,
-          ssl: {
-            rejectUnauthorized: false // Required for Render
-          }
+constructor() {
+  console.log('=== DATABASE CONFIG DEBUG ===');
+  console.log('DATABASE_URL exists:', !!process.env.DATABASE_URL);
+  console.log('DATABASE_URL value:', process.env.DATABASE_URL);
+  console.log('DB_HOST:', process.env.DB_HOST);
+  console.log('DB_NAME:', process.env.DB_NAME);
+  console.log('DB_USER:', process.env.DB_USER);
+  console.log('NODE_ENV:', process.env.NODE_ENV);
+  console.log('============================');
+
+  const poolConfig = process.env.DATABASE_URL
+    ? {
+        connectionString: process.env.DATABASE_URL,
+        ssl: {
+          rejectUnauthorized: false
         }
-      : {
-          user: process.env.DB_USER || 'postgres',
-          host: process.env.DB_HOST || 'localhost',
-          database: process.env.DB_NAME || 'crazy_eights',
-          password: process.env.DB_PASSWORD || 'postgres',
-          port: parseInt(process.env.DB_PORT || '5432'),
-        };
+      }
+    : {
+        user: process.env.DB_USER || 'postgres',
+        host: process.env.DB_HOST || 'localhost',
+        database: process.env.DB_NAME || 'crazy_eights',
+        password: process.env.DB_PASSWORD || 'postgres',
+        port: parseInt(process.env.DB_PORT || '5432'),
+      };
+
+  console.log('Pool config:', JSON.stringify(poolConfig, null, 2));
 
     this.pool = new Pool({
       ...poolConfig,
