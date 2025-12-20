@@ -133,8 +133,4 @@ app.use((error: any, _request: express.Request, response: express.Response, _nex
   });
 });
 
-httpServer.listen(PORT, () => {
-  console.log(`Server started on port ${PORT}`);
-});
-
 startServer();
