@@ -23,6 +23,8 @@ const PORT = process.env.PORT || 3000;
 
 const PgStore = connectPgSimple(session);
 
+/*
+//duplicate pool from before connecting to render
 const pgPool = new pg.Pool({
   user: process.env.DB_USER || 'postgres',
   host: process.env.DB_HOST || 'localhost',
@@ -30,6 +32,7 @@ const pgPool = new pg.Pool({
   password: process.env.DB_PASSWORD || 'postgres',
   port: parseInt(process.env.DB_PORT || '5432'),
 });
+*/
 
 // Configure the session middleware
 app.use(session({
