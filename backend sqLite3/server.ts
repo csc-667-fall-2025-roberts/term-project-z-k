@@ -57,6 +57,6 @@ app.use((error: any, _request: express.Request, response: express.Response, _nex
   });
 });
 
-app.listen(PORT, process.env.port() => {
+app.listen(PORT, () => {
   console.log(`Server started on port ${PORT}`);
 });
